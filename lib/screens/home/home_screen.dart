@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/place_card.dart';
+import '../../widgets/place_list_tile.dart';
 import '../../widgets/review_list_item.dart';
+import '../place/place_list_screen.dart';
 
 class _CategoryItem {
   final String label;
@@ -36,10 +38,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _hasError = false;
-  String? _selectedCategory;
   List<PlaceCardData> _trending = const [];
   List<ReviewListItemData> _recentReviews = const [];
   List<CollectionData> _collections = const [];
+
+  String? _selectedCategory;
+  bool _isFilterLoading = false;
+  List<PlaceCardData> _filteredPlaces = const [];
 
   @override
   void initState() {
@@ -54,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final results = await Future.wait([
-        SupabaseService.fetchTrendingPlaces(category: _selectedCategory),
+        SupabaseService.fetchTrendingPlaces(),
         SupabaseService.fetchRecentReviews(),
         SupabaseService.fetchCollections(),
       ]);
@@ -74,18 +79,45 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onCategoryTap(String key) {
-    setState(() => _selectedCategory = _selectedCategory == key ? null : key);
-    _load();
+  Future<void> _onCategoryTap(String key) async {
+    final next = _selectedCategory == key ? null : key;
+    setState(() => _selectedCategory = next);
+    if (next == null) {
+      setState(() => _filteredPlaces = const []);
+      return;
+    }
+    setState(() => _isFilterLoading = true);
+    try {
+      final results = await SupabaseService.searchPlaces(category: next);
+      if (!mounted) return;
+      setState(() {
+        _filteredPlaces = results;
+        _isFilterLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isFilterLoading = false);
+    }
+  }
+
+  void _openAllTrending() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlaceListScreen(
+        title: 'Сейчас популярно',
+        fetcher: () => SupabaseService.fetchTrendingPlaces(limit: 50),
+        onPlaceTap: (p) => widget.onPlaceTap?.call(p),
+      ),
+    ));
   }
 
   void _openCollection(CollectionData collection) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _CollectionSheet(collection: collection, onPlaceTap: widget.onPlaceTap),
-    );
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlaceListScreen(
+        title: collection.title,
+        fetcher: () async => collection.places,
+        onPlaceTap: (p) => widget.onPlaceTap?.call(p),
+      ),
+    ));
   }
 
   @override
@@ -113,11 +145,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(theme)),
-          SliverToBoxAdapter(child: _buildCategoryRow(theme)),
           SliverToBoxAdapter(
-            child: _SectionTitle(title: 'Сейчас обсуждают', onSeeAll: () {}),
+            child: _SectionTitle(title: 'Сейчас популярно', onSeeAll: _openAllTrending),
           ),
           SliverToBoxAdapter(child: _buildTrendingRow()),
+          SliverToBoxAdapter(child: _buildCategoryFilterHeader(theme)),
+          if (_selectedCategory != null) _buildFilterResultsSliver(theme),
           if (!_isLoading && _recentReviews.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: _SectionTitle(title: 'Новые отзывы', onSeeAll: () {}),
@@ -190,50 +223,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryRow(ThemeData theme) {
-    return SizedBox(
-      height: 84,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final c = _categories[i];
-          final isActive = _selectedCategory == c.key;
-          return _StaggerIn(
-            index: i,
-            child: GestureDetector(
-              onTap: () => _onCategoryTap(c.key),
-              child: Column(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: isActive ? theme.colorScheme.primary.withValues(alpha: 0.15) : theme.cardColor,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: isActive ? theme.colorScheme.primary : theme.dividerColor, width: isActive ? 1.5 : 1),
-                    ),
-                    child: Icon(c.icon, color: theme.colorScheme.primary),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    c.label,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: isActive ? theme.colorScheme.primary : null,
-                      fontWeight: isActive ? FontWeight.w700 : null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildTrendingRow() {
     return SizedBox(
       height: 190,
@@ -246,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : _trending.isEmpty
               ? Center(
-                  child: Text('Ничего не найдено в этой категории', style: Theme.of(context).textTheme.bodyMedium),
+                  child: Text('Пока нет мест', style: Theme.of(context).textTheme.bodyMedium),
                 )
               : ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -260,6 +249,85 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   },
                 ),
+    );
+  }
+
+  Widget _buildCategoryFilterHeader(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+          child: Text('Категории', style: theme.textTheme.headlineMedium),
+        ),
+        SizedBox(
+          height: 84,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _categories.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, i) {
+              final c = _categories[i];
+              final isActive = _selectedCategory == c.key;
+              return GestureDetector(
+                onTap: () => _onCategoryTap(c.key),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: isActive ? theme.colorScheme.primary.withValues(alpha: 0.15) : theme.cardColor,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: isActive ? theme.colorScheme.primary : theme.dividerColor, width: isActive ? 1.5 : 1),
+                      ),
+                      child: Icon(c.icon, color: theme.colorScheme.primary),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      c.label,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isActive ? theme.colorScheme.primary : null,
+                        fontWeight: isActive ? FontWeight.w700 : null,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterResultsSliver(ThemeData theme) {
+    if (_isFilterLoading) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    if (_filteredPlaces.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: Text('В этой категории пока пусто', style: theme.textTheme.bodyMedium)),
+        ),
+      );
+    }
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList.builder(
+        itemCount: _filteredPlaces.length,
+        itemBuilder: (context, i) {
+          final place = _filteredPlaces[i];
+          return PlaceListTile(data: place, onTap: () => widget.onPlaceTap?.call(place));
+        },
+      ),
     );
   }
 
@@ -286,78 +354,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _CollectionSheet extends StatelessWidget {
-  final CollectionData collection;
-  final void Function(PlaceCardData place)? onPlaceTap;
-  const _CollectionSheet({required this.collection, this.onPlaceTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          Text(collection.title, style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 16),
-          ...collection.places.map((p) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onPlaceTap?.call(p);
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.dividerColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                          child: Icon(Icons.place_rounded, color: theme.colorScheme.primary),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(p.name, style: theme.textTheme.titleMedium),
-                              Text('${p.categoryLabel} · ${p.district}', style: theme.textTheme.labelSmall),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )),
-        ],
       ),
     );
   }

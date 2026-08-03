@@ -90,14 +90,13 @@ class SupabaseService {
 
   static const _placeCardColumns = 'id, name, category, district, rating_avg, reviews_count';
 
-  /// "Сейчас обсуждают" — топ мест по количеству недавних отзывов.
-  /// [category] — необязательный фильтр по категории (кнопки-фильтры на главном экране).
-  static Future<List<PlaceCardData>> fetchTrendingPlaces({int limit = 10, String? category}) async {
-    var builder = _client.from('places').select(_placeCardColumns);
-    if (category != null) {
-      builder = builder.eq('category', category);
-    }
-    final rows = await builder.order('reviews_count', ascending: false).limit(limit);
+  /// "Сейчас популярно" — места с самым высоким рейтингом.
+  static Future<List<PlaceCardData>> fetchTrendingPlaces({int limit = 10}) async {
+    final rows = await _client
+        .from('places')
+        .select(_placeCardColumns)
+        .order('rating_avg', ascending: false)
+        .limit(limit);
 
     return (rows as List).map((r) => _placeFromRow(r)).toList();
   }
