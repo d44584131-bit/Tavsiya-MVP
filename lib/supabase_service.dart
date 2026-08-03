@@ -177,7 +177,7 @@ class SupabaseService {
   static Future<List<PlaceReviewData>> fetchApprovedReviews(String placeId, {int limit = 20}) async {
     final rows = await _client
         .from('reviews')
-        .select('rating, text, pros, cons, profiles(display_name)')
+        .select('rating, text, pros, cons, profiles!reviews_user_id_fkey(display_name)')
         .eq('place_id', placeId)
         .eq('status', 'approved')
         .order('created_at', ascending: false)
@@ -199,7 +199,7 @@ class SupabaseService {
   static Future<List<ReviewListItemData>> fetchRecentReviews({int limit = 10}) async {
     final rows = await _client
         .from('reviews')
-        .select('rating, text, profiles(display_name), places(name)')
+        .select('rating, text, profiles!reviews_user_id_fkey(display_name), places(name)')
         .eq('status', 'approved')
         .order('created_at', ascending: false)
         .limit(limit);
