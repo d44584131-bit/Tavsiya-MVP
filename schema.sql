@@ -192,6 +192,25 @@ create table public.review_drafts (
 
 create index review_drafts_user_idx on public.review_drafts (user_id);
 
+-- ---------------------------------------------------------
+-- collections / collection_places — курируемые подборки мест
+-- ("Подборки для вас" на главном экране)
+-- ---------------------------------------------------------
+
+create table public.collections (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table public.collection_places (
+  collection_id uuid not null references public.collections (id) on delete cascade,
+  place_id uuid not null references public.places (id) on delete cascade,
+  sort_order integer not null default 0,
+  primary key (collection_id, place_id)
+);
+
 -- =========================================================
 -- ТРИГГЕРЫ: денормализованные счётчики
 -- =========================================================
@@ -326,6 +345,8 @@ alter table public.review_helpful_votes enable row level security;
 alter table public.saved_places enable row level security;
 alter table public.follows enable row level security;
 alter table public.review_drafts enable row level security;
+alter table public.collections enable row level security;
+alter table public.collection_places enable row level security;
 
 -- profiles: читать может любой (публичный профиль), редактировать — только владелец
 create policy "profiles_select_all" on public.profiles for select using (true);
@@ -382,6 +403,10 @@ create policy "follows_delete_own" on public.follows for delete using (auth.uid(
 -- review_drafts: полностью приватны
 create policy "drafts_all_own" on public.review_drafts
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- collections: читать может любой; управляют только через дашборд/сервисную роль
+create policy "collections_select_all" on public.collections for select using (true);
+create policy "collection_places_select_all" on public.collection_places for select using (true);
 
 -- =========================================================
 -- STORAGE BUCKETS (создать через Dashboard или отдельным скриптом)

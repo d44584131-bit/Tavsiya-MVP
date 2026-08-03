@@ -18,6 +18,13 @@ const _categories = [
   _CategoryItem('ТЦ', 'mall', Icons.storefront_rounded),
 ];
 
+class CollectionData {
+  final String id;
+  final String title;
+  final List<PlaceCardData> places;
+  const CollectionData({required this.id, required this.title, required this.places});
+}
+
 class HomeScreen extends StatefulWidget {
   final void Function(PlaceCardData place)? onPlaceTap;
   const HomeScreen({super.key, this.onPlaceTap});
@@ -29,8 +36,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _hasError = false;
+  String? _selectedCategory;
   List<PlaceCardData> _trending = const [];
   List<ReviewListItemData> _recentReviews = const [];
+  List<CollectionData> _collections = const [];
 
   @override
   void initState() {
@@ -45,13 +54,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final results = await Future.wait([
-        SupabaseService.fetchTrendingPlaces(),
+        SupabaseService.fetchTrendingPlaces(category: _selectedCategory),
         SupabaseService.fetchRecentReviews(),
+        SupabaseService.fetchCollections(),
       ]);
       if (!mounted) return;
       setState(() {
         _trending = results[0] as List<PlaceCardData>;
         _recentReviews = results[1] as List<ReviewListItemData>;
+        _collections = results[2] as List<CollectionData>;
         _isLoading = false;
       });
     } catch (_) {
@@ -61,6 +72,20 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _onCategoryTap(String key) {
+    setState(() => _selectedCategory = _selectedCategory == key ? null : key);
+    _load();
+  }
+
+  void _openCollection(CollectionData collection) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _CollectionSheet(collection: collection, onPlaceTap: widget.onPlaceTap),
+    );
   }
 
   @override
@@ -108,10 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
-          SliverToBoxAdapter(
-            child: _SectionTitle(title: 'Подборки для вас', onSeeAll: () {}),
-          ),
-          SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
+          if (!_isLoading && _collections.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: _SectionTitle(title: 'Подборки для вас', onSeeAll: () {}),
+            ),
+            SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
+          ],
           const SliverToBoxAdapter(child: SizedBox(height: 90)),
         ],
       ),
@@ -173,23 +200,33 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (context, i) {
           final c = _categories[i];
+          final isActive = _selectedCategory == c.key;
           return _StaggerIn(
             index: i,
-            child: Column(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: theme.cardColor,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: theme.dividerColor),
+            child: GestureDetector(
+              onTap: () => _onCategoryTap(c.key),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: isActive ? theme.colorScheme.primary.withValues(alpha: 0.15) : theme.cardColor,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: isActive ? theme.colorScheme.primary : theme.dividerColor, width: isActive ? 1.5 : 1),
+                    ),
+                    child: Icon(c.icon, color: theme.colorScheme.primary),
                   ),
-                  child: Icon(c.icon, color: theme.colorScheme.primary),
-                ),
-                const SizedBox(height: 6),
-                Text(c.label, style: theme.textTheme.labelSmall),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    c.label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: isActive ? theme.colorScheme.primary : null,
+                      fontWeight: isActive ? FontWeight.w700 : null,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -200,40 +237,127 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTrendingRow() {
     return SizedBox(
       height: 190,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _isLoading ? 3 : _trending.length,
-        itemBuilder: (context, i) {
-          if (_isLoading) return const PlaceCardSkeleton();
-          final place = _trending[i];
-          return _StaggerIn(
-            index: i,
-            child: PlaceCard(data: place, onTap: () => widget.onPlaceTap?.call(place)),
-          );
-        },
-      ),
+      child: _isLoading
+          ? ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: 3,
+              itemBuilder: (context, i) => const PlaceCardSkeleton(),
+            )
+          : _trending.isEmpty
+              ? Center(
+                  child: Text('Ничего не найдено в этой категории', style: Theme.of(context).textTheme.bodyMedium),
+                )
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _trending.length,
+                  itemBuilder: (context, i) {
+                    final place = _trending[i];
+                    return _StaggerIn(
+                      index: i,
+                      child: PlaceCard(data: place, onTap: () => widget.onPlaceTap?.call(place)),
+                    );
+                  },
+                ),
     );
   }
 
   Widget _buildCollectionsCarousel(ThemeData theme) {
-    final collections = ['Романтический вечер', 'С детьми', 'Бюджетно', 'Новинки района'];
     return SizedBox(
       height: 64,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: collections.length,
+        itemCount: _collections.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, i) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: AppColors.headerGradient(_categories[i % 4].key, isDark: theme.brightness == Brightness.dark)),
-            borderRadius: BorderRadius.circular(16),
+        itemBuilder: (context, i) {
+          final collection = _collections[i];
+          return GestureDetector(
+            onTap: () => _openCollection(collection),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: AppColors.headerGradient(_categories[i % 4].key, isDark: theme.brightness == Brightness.dark)),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(collection.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CollectionSheet extends StatelessWidget {
+  final CollectionData collection;
+  final void Function(PlaceCardData place)? onPlaceTap;
+  const _CollectionSheet({required this.collection, this.onPlaceTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
+            ),
           ),
-          child: Text(collections[i], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-        ),
+          Text(collection.title, style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 16),
+          ...collection.places.map((p) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onPlaceTap?.call(p);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: theme.dividerColor),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                          child: Icon(Icons.place_rounded, color: theme.colorScheme.primary),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.name, style: theme.textTheme.titleMedium),
+                              Text('${p.categoryLabel} · ${p.district}', style: theme.textTheme.labelSmall),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )),
+        ],
       ),
     );
   }

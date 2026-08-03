@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'screens/home/home_screen.dart';
 import 'screens/place/place_detail_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'widgets/place_card.dart';
@@ -90,12 +91,13 @@ class SupabaseService {
   static const _placeCardColumns = 'id, name, category, district, rating_avg, reviews_count';
 
   /// "Сейчас обсуждают" — топ мест по количеству недавних отзывов.
-  static Future<List<PlaceCardData>> fetchTrendingPlaces({int limit = 10}) async {
-    final rows = await _client
-        .from('places')
-        .select(_placeCardColumns)
-        .order('reviews_count', ascending: false)
-        .limit(limit);
+  /// [category] — необязательный фильтр по категории (кнопки-фильтры на главном экране).
+  static Future<List<PlaceCardData>> fetchTrendingPlaces({int limit = 10, String? category}) async {
+    var builder = _client.from('places').select(_placeCardColumns);
+    if (category != null) {
+      builder = builder.eq('category', category);
+    }
+    final rows = await builder.order('reviews_count', ascending: false).limit(limit);
 
     return (rows as List).map((r) => _placeFromRow(r)).toList();
   }
@@ -166,6 +168,25 @@ class SupabaseService {
       reviewsCount: r['reviews_count'] as int,
       district: (r['district'] as String?) ?? '',
     );
+  }
+
+  /// "Подборки для вас" на главном экране — курируемые списки мест.
+  static Future<List<CollectionData>> fetchCollections() async {
+    final rows = await _client
+        .from('collections')
+        .select('id, title, collection_places(sort_order, places($_placeCardColumns))')
+        .order('sort_order');
+
+    return (rows as List).map((r) {
+      final placeRows = (r['collection_places'] as List).toList()
+        ..sort((a, b) => (a['sort_order'] as int).compareTo(b['sort_order'] as int));
+      final places = placeRows
+          .map((cp) => cp['places'] as Map<String, dynamic>?)
+          .whereType<Map<String, dynamic>>()
+          .map(_placeFromRow)
+          .toList();
+      return CollectionData(id: r['id'] as String, title: r['title'] as String, places: places);
+    }).toList();
   }
 
   // ------------------------------------------------------------
