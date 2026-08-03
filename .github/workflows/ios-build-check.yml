@@ -1,0 +1,23 @@
+name: iOS build check
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-simulator:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter pub get
+
+      # Сборка под симулятор без подписи — просто проверка, что iOS-часть
+      # проекта компилируется. Установить на реальный iPhone так нельзя:
+      # для этого нужен платный Apple Developer Program и TestFlight.
+      - run: flutter build ios --simulator --no-codesign
