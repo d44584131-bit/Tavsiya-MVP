@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/dot_indicator.dart';
+import '../auth/auth_screen.dart';
 
 class OnboardingPageData {
   final String titlePrefix; // обычный текст
@@ -80,6 +81,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   bool get _isLast => _index == _pages(context).length - 1;
 
+  Future<void> _openLogin() async {
+    // "У меня уже есть аккаунт" — открываем настоящий экран входа, а не
+    // просто пропускаем онбординг: до этого кнопка ничего не проверяла.
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
+    if (!mounted) return;
+    widget.onFinish();
+  }
+
   void _next() {
     if (_isLast) {
       widget.onFinish();
@@ -137,7 +146,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 20),
                     child: TextButton(
-                      onPressed: widget.onFinish,
+                      onPressed: _openLogin,
                       child: Text(s(context).alreadyHaveAccount),
                     ),
                   ),
