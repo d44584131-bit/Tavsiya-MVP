@@ -98,6 +98,7 @@ class Strings {
   String get infoAvgCheck => _t('Средний чек', 'Oʻrtacha chek');
   String get leaveReview => _t('Оставить отзыв', 'Sharh qoldirish');
   String get pendingBadge => _t('На модерации', 'Moderatsiyada');
+  String get rejectedBadge => _t('Отклонён', 'Rad etilgan');
   String get saveError => _t('Не удалось сохранить место, попробуйте ещё раз', 'Joyni saqlab boʻlmadi, qayta urinib koʻring');
   String get guestReviewer => _t('Гость', 'Mehmon');
   String get placeDeleted => _t('Место удалено', 'Joy oʻchirilgan');
@@ -193,6 +194,7 @@ class Strings {
   String get noDraftsTitle => _t('Нет черновиков', 'Qoralamalar yoʻq');
   String get noDraftsSubtitle =>
       _t('Незаконченные отзывы будут сохраняться здесь автоматически', 'Tugallanmagan sharhlar shu yerda avtomatik saqlanadi');
+  String get draftNoPlace => _t('Черновик без места', 'Joysiz qoralama');
   String get languageSectionTitle => _t('Язык интерфейса', 'Interfeys tili');
   String get themeSectionTitle => _t('Тема оформления', 'Mavzu');
   String get themeSystem => _t('Как в системе', 'Tizimdagidek');

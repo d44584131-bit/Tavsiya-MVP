@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthState;
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/place_card.dart';
@@ -11,6 +12,7 @@ import '../../widgets/place_list_tile.dart';
 import '../../widgets/place_review_card.dart';
 import '../auth/auth_screen.dart';
 import '../feedback/feedback_screen.dart';
+import '../review_form/review_form_screen.dart' show ReviewDraftData;
 
 enum AppLanguage { ru, uz }
 
@@ -41,6 +43,7 @@ class ProfileScreen extends StatefulWidget {
   final ValueChanged<AppThemeMode> onThemeModeChanged;
   final bool isActive;
   final void Function(PlaceCardData place)? onPlaceTap;
+  final void Function(ReviewDraftData draft)? onOpenDraft;
 
   const ProfileScreen({
     super.key,
@@ -50,6 +53,7 @@ class ProfileScreen extends StatefulWidget {
     required this.onThemeModeChanged,
     this.isActive = true,
     this.onPlaceTap,
+    this.onOpenDraft,
   });
 
   @override
@@ -65,6 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   MyProfileData? _profile;
   List<PlaceReviewData> _myReviews = const [];
   List<PlaceCardData> _savedPlaces = const [];
+  List<ReviewDraftData> _drafts = const [];
   int _savedSubTab = 0; // 0 = места, 1 = отзывы
 
   @override
@@ -101,6 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         _profile = null;
         _myReviews = const [];
         _savedPlaces = const [];
+        _drafts = const [];
       });
       return;
     }
@@ -113,12 +119,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         SupabaseService.fetchMyProfile(),
         SupabaseService.fetchMyReviews(language: widget.language),
         SupabaseService.fetchSavedPlaces(),
+        SupabaseService.fetchMyDrafts(),
       ]);
       if (!mounted) return;
       setState(() {
         _profile = results[0] as MyProfileData;
         _myReviews = results[1] as List<PlaceReviewData>;
         _savedPlaces = results[2] as List<PlaceCardData>;
+        _drafts = results[3] as List<ReviewDraftData>;
         _isLoading = false;
       });
     } catch (_) {
@@ -271,11 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 title: s(context).noSubscriptionsTitle,
                 subtitle: s(context).noSubscriptionsSubtitle,
               ),
-              _buildEmptyTab(
-                icon: Icons.edit_note_rounded,
-                title: s(context).noDraftsTitle,
-                subtitle: s(context).noDraftsSubtitle,
-              ),
+              _buildDraftsTab(theme),
             ],
           ),
         ),
@@ -357,8 +361,95 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
+  Widget _buildDraftsTab(ThemeData theme) {
+    if (_drafts.isEmpty) {
+      return EmptyState(
+        icon: Icons.edit_note_rounded,
+        title: s(context).noDraftsTitle,
+        subtitle: s(context).noDraftsSubtitle,
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      itemCount: _drafts.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, i) {
+        final draft = _drafts[i];
+        return _DraftTile(
+          data: draft,
+          onTap: () => widget.onOpenDraft?.call(draft),
+          onDelete: () => _deleteDraft(draft),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteDraft(ReviewDraftData draft) async {
+    setState(() => _drafts = _drafts.where((d) => d.id != draft.id).toList());
+    try {
+      await SupabaseService.deleteDraft(draft.id);
+    } catch (_) {
+      if (mounted) _load();
+    }
+  }
+
   Widget _buildEmptyTab({required IconData icon, required String title, required String subtitle}) {
     return EmptyState(icon: icon, title: title, subtitle: subtitle);
+  }
+}
+
+class _DraftTile extends StatelessWidget {
+  final ReviewDraftData data;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  const _DraftTile({required this.data, required this.onTap, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(data.placeName ?? s(context).draftNoPlace, style: theme.textTheme.titleMedium),
+                  if (data.rating != null && data.rating! > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: List.generate(
+                        5,
+                        (i) => Icon(
+                          Icons.star_rounded,
+                          size: 13,
+                          color: i < data.rating! ? AppColors.accentOrange : theme.dividerColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (data.text != null && data.text!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(data.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
+                  ],
+                ],
+              ),
+            ),
+            IconButton(icon: const Icon(Icons.delete_outline_rounded), onPressed: onDelete),
+          ],
+        ),
+      ),
+    );
   }
 }
 

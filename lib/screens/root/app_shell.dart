@@ -54,10 +54,10 @@ class _AppShellState extends State<AppShell> {
     setState(() => _navIndex = index);
   }
 
-  Future<void> _openReviewForm({PlaceCardData? place}) {
+  Future<void> _openReviewForm({PlaceCardData? place, ReviewDraftData? draft}) {
     return _navigatorKey.currentState!.push(
       MaterialPageRoute(
-        builder: (_) => ReviewFormScreen(preselectedPlace: place, language: widget.language),
+        builder: (_) => ReviewFormScreen(preselectedPlace: place, initialDraft: draft, language: widget.language),
       ),
     );
   }
@@ -74,6 +74,7 @@ class _AppShellState extends State<AppShell> {
         onThemeModeChanged: widget.onThemeModeChanged,
         isActive: _navIndex == 2,
         onPlaceTap: _openPlace,
+        onOpenDraft: (d) => _openReviewForm(draft: d),
       ),
     ];
 

@@ -33,4 +33,18 @@ class FeedbackService {
       throw Exception('Не удалось отправить сообщение');
     }
   }
+
+  /// Уведомляет администратора в Telegram о новом отзыве на модерации
+  /// (`api/notify-review.js`) — сообщение с кнопками "Одобрить"/"Отклонить",
+  /// нажатия обрабатывает `api/telegram-webhook.js`.
+  static Future<void> notifyNewReview(String reviewId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/notify-review'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'reviewId': reviewId}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось отправить уведомление о модерации');
+    }
+  }
 }

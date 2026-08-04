@@ -10,10 +10,39 @@ import '../../widgets/chip_selector.dart';
 import '../auth/auth_screen.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
 
+/// Черновик отзыва (таблица review_drafts) — сохраняется при выходе из формы
+/// с незаконченным отзывом, показывается во вкладке "Черновики" в профиле.
+class ReviewDraftData {
+  final String id;
+  final String? placeId;
+  final String? placeName; // название существующего места или ещё не созданного
+  final int? rating;
+  final String? text;
+  final String? pros;
+  final String? cons;
+  final String? priceLevel;
+  final String? withWhom;
+  final DateTime updatedAt;
+
+  const ReviewDraftData({
+    required this.id,
+    this.placeId,
+    this.placeName,
+    this.rating,
+    this.text,
+    this.pros,
+    this.cons,
+    this.priceLevel,
+    this.withWhom,
+    required this.updatedAt,
+  });
+}
+
 class ReviewFormScreen extends StatefulWidget {
   final PlaceCardData? preselectedPlace; // если пришли с карточки места — шаг 1 пропускается
+  final ReviewDraftData? initialDraft; // если продолжаем черновик — тоже пропускается
   final AppLanguage language;
-  const ReviewFormScreen({super.key, this.preselectedPlace, required this.language});
+  const ReviewFormScreen({super.key, this.preselectedPlace, this.initialDraft, required this.language});
 
   @override
   State<ReviewFormScreen> createState() => _ReviewFormScreenState();
@@ -21,11 +50,12 @@ class ReviewFormScreen extends StatefulWidget {
 
 class _ReviewFormScreenState extends State<ReviewFormScreen> {
   static const _maxChars = 500;
-  late final _controller = PageController(initialPage: widget.preselectedPlace != null ? 1 : 0);
+  bool get _hasPreselection => widget.preselectedPlace != null || widget.initialDraft != null;
+  late final _controller = PageController(initialPage: _hasPreselection ? 1 : 0);
   final _textController = TextEditingController();
   final _searchController = TextEditingController();
 
-  late int _step = widget.preselectedPlace != null ? 1 : 0;
+  late int _step = _hasPreselection ? 1 : 0;
   PlaceCardData? _selectedExistingPlace;
   String? _newPlaceName;
   String? _newPlaceCategory;
@@ -37,6 +67,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   String? _withWhomChip;
   bool _isSubmitting = false;
   String? _submitError;
+  String? _draftId; // если продолжаем черновик — обновляем его вместо создания нового
 
   Timer? _searchDebounce;
   bool _isSearchingPlaces = false;
@@ -67,8 +98,69 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedExistingPlace = widget.preselectedPlace;
+    final draft = widget.initialDraft;
+    if (draft != null) {
+      _draftId = draft.id;
+      if (draft.placeId != null) {
+        _selectedExistingPlace = PlaceCardData(
+          id: draft.placeId!,
+          name: draft.placeName ?? '',
+          category: 'restaurant',
+          rating: 0,
+          reviewsCount: 0,
+          district: '',
+        );
+      } else {
+        _newPlaceName = draft.placeName;
+      }
+      _rating = draft.rating ?? 0;
+      _textController.text = draft.text ?? '';
+      _prosController.text = draft.pros ?? '';
+      _consController.text = draft.cons ?? '';
+      _priceChip = draft.priceLevel;
+      _withWhomChip = draft.withWhom;
+    } else {
+      _selectedExistingPlace = widget.preselectedPlace;
+    }
     _searchPlaces();
+  }
+
+  bool get _hasDraftableContent =>
+      _selectedExistingPlace != null ||
+      (_newPlaceName != null && _newPlaceName!.isNotEmpty) ||
+      _rating > 0 ||
+      _textController.text.trim().isNotEmpty ||
+      _prosController.text.trim().isNotEmpty ||
+      _consController.text.trim().isNotEmpty;
+
+  Future<void> _maybeSaveDraft() async {
+    if (_step == 3) return; // отзыв уже опубликован, черновик уже удалён в _submit()
+    if (!_hasDraftableContent) {
+      if (_draftId != null) {
+        try {
+          await SupabaseService.deleteDraft(_draftId!);
+        } catch (_) {
+          // не блокируем закрытие формы из-за ошибки сети
+        }
+      }
+      return;
+    }
+    if (SupabaseService.currentUser == null) return; // без входа черновики не сохраняем
+    try {
+      _draftId = await SupabaseService.saveDraft(
+        draftId: _draftId,
+        placeId: _selectedExistingPlace?.id,
+        placeNameDraft: _selectedExistingPlace == null ? _newPlaceName : null,
+        rating: _rating,
+        text: _textController.text.trim().isEmpty ? null : _textController.text.trim(),
+        pros: _prosController.text.trim().isEmpty ? null : _prosController.text.trim(),
+        cons: _consController.text.trim().isEmpty ? null : _consController.text.trim(),
+        priceLevel: _priceChip,
+        withWhom: _withWhomChip,
+      );
+    } catch (_) {
+      // не удалось сохранить черновик — не блокируем закрытие формы
+    }
   }
 
   @override
@@ -137,6 +229,13 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         withWhom: _withWhomChip,
         language: widget.language == AppLanguage.uz ? 'uz' : 'ru',
       );
+      if (_draftId != null) {
+        try {
+          await SupabaseService.deleteDraft(_draftId!);
+        } catch (_) {
+          // отзыв уже опубликован — не блокируем успех из-за черновика
+        }
+      }
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       _goTo(3);
@@ -152,31 +251,41 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(s(context).leaveReview),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.maybePop(context),
-        ),
-      ),
-      body: Column(
-        children: [
-          _buildProgress(theme),
-          Expanded(
-            child: PageView(
-              controller: _controller,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildPlaceStep(theme),
-                _buildRatingStep(theme),
-                _buildDetailsStep(theme),
-                _buildDoneStep(theme),
-              ],
-            ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        await _maybeSaveDraft();
+        if (!mounted) return;
+        navigator.pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(s(context).leaveReview),
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => Navigator.maybePop(context),
           ),
-          if (_step < 3) _buildBottomBar(theme),
-        ],
+        ),
+        body: Column(
+          children: [
+            _buildProgress(theme),
+            Expanded(
+              child: PageView(
+                controller: _controller,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildPlaceStep(theme),
+                  _buildRatingStep(theme),
+                  _buildDetailsStep(theme),
+                  _buildDoneStep(theme),
+                ],
+              ),
+            ),
+            if (_step < 3) _buildBottomBar(theme),
+          ],
+        ),
       ),
     );
   }

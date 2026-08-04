@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'l10n/strings.dart';
+import 'services/feedback_service.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/place/place_detail_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/review_form/review_form_screen.dart';
 import 'widgets/place_card.dart';
 import 'widgets/place_review_card.dart';
 import 'widgets/review_list_item.dart';
@@ -71,7 +73,7 @@ class SupabaseService {
               text: r['text'] as String,
               pros: r['pros'] as String?,
               cons: r['cons'] as String?,
-              isPending: r['status'] != 'approved',
+              moderationStatus: r['status'] == 'approved' ? null : r['status'] as String?,
             ))
         .toList();
   }
@@ -203,19 +205,17 @@ class SupabaseService {
   // Отзывы
   // ------------------------------------------------------------
 
-  /// Отзывы места — только approved, независимо от языка интерфейса
-  /// (см. правило многоязычности: отзывы не фильтруются по языку).
+  /// Отзывы места — approved и pending видны всем сразу (с пометкой "на
+  /// модерации"), независимо от языка интерфейса (см. правило многоязычности:
+  /// отзывы не фильтруются по языку). rejected виден только автору — это
+  /// обеспечивает RLS-политика reviews_select_approved_or_own.
   static Future<List<PlaceReviewData>> fetchApprovedReviews(String placeId, {required AppLanguage language, int limit = 20}) async {
-    final userId = _client.auth.currentUser?.id;
-    var builder = _client
+    final rows = await _client
         .from('reviews')
         .select('rating, text, pros, cons, status, profiles!reviews_user_id_fkey(display_name)')
-        .eq('place_id', placeId);
-    // approved-отзывы видны всем; собственный ещё не прошедший модерацию
-    // отзыв — только автору (см. RLS reviews_select_approved_or_own).
-    builder = userId != null ? builder.or('status.eq.approved,user_id.eq.$userId') : builder.eq('status', 'approved');
-
-    final rows = await builder.order('created_at', ascending: false).limit(limit);
+        .eq('place_id', placeId)
+        .order('created_at', ascending: false)
+        .limit(limit);
 
     return (rows as List).map((r) {
       final profile = r['profiles'] as Map<String, dynamic>?;
@@ -225,7 +225,7 @@ class SupabaseService {
         text: r['text'] as String,
         pros: r['pros'] as String?,
         cons: r['cons'] as String?,
-        isPending: r['status'] != 'approved',
+        moderationStatus: r['status'] == 'approved' ? null : r['status'] as String?,
       );
     }).toList();
   }
@@ -251,10 +251,10 @@ class SupabaseService {
     }).toList();
   }
 
-  /// Публикация нового отзыва — на этапе тестирования MVP публикуется сразу
-  /// со статусом 'approved' (модерация отключена, чтобы тестерам не ждать
-  /// ручного одобрения). Статус 'pending'/'rejected' остаётся в схеме и
-  /// поддерживается в UI — ими можно управлять вручную через Supabase.
+  /// Публикация нового отзыва — создаётся со статусом 'pending' и сразу
+  /// виден всем в списке отзывов места (с пометкой "на модерации"), пока
+  /// администратор не одобрит/отклонит его в Telegram-боте (см.
+  /// api/notify-review.js и api/telegram-webhook.js).
   static Future<void> submitReview({
     required String placeId,
     required int rating,
@@ -268,18 +268,28 @@ class SupabaseService {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
 
-    await _client.from('reviews').insert({
-      'place_id': placeId,
-      'user_id': userId,
-      'rating': rating,
-      'text': text,
-      'pros': pros,
-      'cons': cons,
-      'price_level': priceLevel,
-      'with_whom': withWhom,
-      'language': language,
-      'status': 'approved',
-    });
+    final row = await _client
+        .from('reviews')
+        .insert({
+          'place_id': placeId,
+          'user_id': userId,
+          'rating': rating,
+          'text': text,
+          'pros': pros,
+          'cons': cons,
+          'price_level': priceLevel,
+          'with_whom': withWhom,
+          'language': language,
+          'status': 'pending',
+        })
+        .select('id')
+        .single();
+
+    try {
+      await FeedbackService.notifyNewReview(row['id'] as String);
+    } catch (_) {
+      // уведомление в Telegram не критично для успешной публикации отзыва
+    }
   }
 
   // ------------------------------------------------------------
@@ -316,5 +326,77 @@ class SupabaseService {
     } else {
       await _client.from('saved_places').delete().match({'user_id': userId, 'place_id': placeId});
     }
+  }
+
+  // ------------------------------------------------------------
+  // Черновики отзывов
+  // ------------------------------------------------------------
+
+  static Future<List<ReviewDraftData>> fetchMyDrafts() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+
+    final rows = await _client
+        .from('review_drafts')
+        .select('id, place_id, place_name_draft, rating, text, pros, cons, price_level, with_whom, updated_at, places(name)')
+        .eq('user_id', userId)
+        .order('updated_at', ascending: false);
+
+    return (rows as List).map((r) {
+      final place = r['places'] as Map<String, dynamic>?;
+      return ReviewDraftData(
+        id: r['id'] as String,
+        placeId: r['place_id'] as String?,
+        placeName: (place?['name'] as String?) ?? r['place_name_draft'] as String?,
+        rating: r['rating'] as int?,
+        text: r['text'] as String?,
+        pros: r['pros'] as String?,
+        cons: r['cons'] as String?,
+        priceLevel: r['price_level'] as String?,
+        withWhom: r['with_whom'] as String?,
+        updatedAt: DateTime.parse(r['updated_at'] as String),
+      );
+    }).toList();
+  }
+
+  /// Сохраняет черновик отзыва: создаёт новый или обновляет существующий,
+  /// если передан [draftId]. Возвращает id сохранённого черновика.
+  static Future<String> saveDraft({
+    String? draftId,
+    String? placeId,
+    String? placeNameDraft,
+    int? rating,
+    String? text,
+    String? pros,
+    String? cons,
+    String? priceLevel,
+    String? withWhom,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+
+    final payload = {
+      'user_id': userId,
+      'place_id': placeId,
+      'place_name_draft': placeId == null ? placeNameDraft : null,
+      'rating': rating,
+      'text': text,
+      'pros': pros,
+      'cons': cons,
+      'price_level': priceLevel,
+      'with_whom': withWhom,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    if (draftId != null) {
+      await _client.from('review_drafts').update(payload).eq('id', draftId);
+      return draftId;
+    }
+    final row = await _client.from('review_drafts').insert(payload).select('id').single();
+    return row['id'] as String;
+  }
+
+  static Future<void> deleteDraft(String id) async {
+    await _client.from('review_drafts').delete().eq('id', id);
   }
 }

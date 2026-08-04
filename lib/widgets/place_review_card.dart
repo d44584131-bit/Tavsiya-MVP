@@ -9,7 +9,7 @@ class PlaceReviewData {
   final int photosCount; // сколько фото приложено (заглушки-квадраты)
   final String? pros;
   final String? cons;
-  final bool isPending; // отзыв виден только автору, пока не пройдёт модерацию
+  final String? moderationStatus; // 'pending' | 'rejected' | null (= approved)
 
   const PlaceReviewData({
     required this.authorName,
@@ -18,7 +18,7 @@ class PlaceReviewData {
     this.photosCount = 0,
     this.pros,
     this.cons,
-    this.isPending = false,
+    this.moderationStatus,
   });
 }
 
@@ -69,7 +69,7 @@ class PlaceReviewCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (data.isPending)
+              if (data.moderationStatus == 'pending')
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -77,6 +77,15 @@ class PlaceReviewCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(s(context).pendingBadge, style: const TextStyle(fontSize: 11, color: AppColors.accentOrange, fontWeight: FontWeight.w600)),
+                ),
+              if (data.moderationStatus == 'rejected')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.negative.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(s(context).rejectedBadge, style: const TextStyle(fontSize: 11, color: AppColors.negative, fontWeight: FontWeight.w600)),
                 ),
             ],
           ),

@@ -370,9 +370,13 @@ create policy "places_insert_authenticated" on public.places for insert with che
 create policy "place_photos_select_all" on public.place_photos for select using (true);
 create policy "place_photos_insert_authenticated" on public.place_photos for insert with check (auth.uid() is not null);
 
--- reviews: видны всем approved-отзывы + собственные отзывы автору (включая pending/rejected)
+-- reviews: approved и pending видны всем сразу (с пометкой "на модерации" в
+-- приложении); rejected виден только автору. Модерация — через Telegram-бота
+-- (см. api/notify-review.js, api/telegram-webhook.js).
+-- NB: постгрес не поддерживает CREATE OR REPLACE POLICY — если политика уже
+-- существует, сначала drop policy if exists ..., потом create policy ...
 create policy "reviews_select_approved_or_own" on public.reviews
-  for select using (status = 'approved' or auth.uid() = user_id);
+  for select using (status in ('approved', 'pending') or auth.uid() = user_id);
 
 create policy "reviews_insert_own" on public.reviews
   for insert with check (auth.uid() = user_id);
