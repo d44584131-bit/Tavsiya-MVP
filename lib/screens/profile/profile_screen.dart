@@ -2,11 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthState;
+import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/place_card.dart';
+import '../../widgets/place_list_tile.dart';
 import '../../widgets/place_review_card.dart';
 import '../auth/auth_screen.dart';
+import '../feedback/feedback_screen.dart';
 
 enum AppLanguage { ru, uz }
 
@@ -35,6 +39,8 @@ class ProfileScreen extends StatefulWidget {
   final AppThemeMode themeMode;
   final ValueChanged<AppLanguage> onLanguageChanged;
   final ValueChanged<AppThemeMode> onThemeModeChanged;
+  final bool isActive;
+  final void Function(PlaceCardData place)? onPlaceTap;
 
   const ProfileScreen({
     super.key,
@@ -42,6 +48,8 @@ class ProfileScreen extends StatefulWidget {
     required this.themeMode,
     required this.onLanguageChanged,
     required this.onThemeModeChanged,
+    this.isActive = true,
+    this.onPlaceTap,
   });
 
   @override
@@ -56,6 +64,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _hasError = false;
   MyProfileData? _profile;
   List<PlaceReviewData> _myReviews = const [];
+  List<PlaceCardData> _savedPlaces = const [];
+  int _savedSubTab = 0; // 0 = места, 1 = отзывы
 
   @override
   void initState() {
@@ -71,6 +81,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Вкладка живёт внутри IndexedStack и не пересоздаётся при переключении
+    // табов — подгружаем профиль и отзывы заново при каждом возврате на неё
+    // (например, после публикации отзыва с другого экрана).
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     if (SupabaseService.currentUser == null) {
       if (!mounted) return;
@@ -79,6 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         _hasError = false;
         _profile = null;
         _myReviews = const [];
+        _savedPlaces = const [];
       });
       return;
     }
@@ -89,12 +111,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     try {
       final results = await Future.wait([
         SupabaseService.fetchMyProfile(),
-        SupabaseService.fetchMyReviews(),
+        SupabaseService.fetchMyReviews(language: widget.language),
+        SupabaseService.fetchSavedPlaces(),
       ]);
       if (!mounted) return;
       setState(() {
         _profile = results[0] as MyProfileData;
         _myReviews = results[1] as List<PlaceReviewData>;
+        _savedPlaces = results[2] as List<PlaceCardData>;
         _isLoading = false;
       });
     } catch (_) {
@@ -128,6 +152,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           Navigator.of(context).pop();
           _signOut();
         },
+        onFeedback: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FeedbackScreen()));
+        },
       ),
     );
   }
@@ -138,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Профиль'),
+        title: Text(s(context).profileTitle),
         actions: [
           IconButton(icon: const Icon(Icons.settings_outlined), onPressed: _openSettings),
         ],
@@ -151,9 +179,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     if (SupabaseService.currentUser == null) {
       return EmptyState(
         icon: Icons.person_outline_rounded,
-        title: 'Войдите в аккаунт',
-        subtitle: 'Чтобы видеть свой профиль, отзывы и сохранённые места',
-        action: ElevatedButton(onPressed: _openAuth, child: const Text('Войти')),
+        title: s(context).signInPromptTitle,
+        subtitle: s(context).signInPromptSubtitle,
+        action: ElevatedButton(onPressed: _openAuth, child: Text(s(context).signInButton)),
       );
     }
     if (_isLoading) {
@@ -166,9 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Не удалось загрузить профиль', style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+              Text(s(context).profileLoadError, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _load, child: const Text('Повторить')),
+              ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
             ],
           ),
         ),
@@ -200,19 +228,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: _CounterItem(value: '${profile.reviewsCount}', label: 'Отзывов')),
-                  Expanded(child: _CounterItem(value: '${profile.helpfulVotesCount}', label: 'Полезно')),
-                  Expanded(child: _CounterItem(value: '${profile.savedCount}', label: 'Сохранено')),
-                  Expanded(child: _CounterItem(value: '${profile.followersCount}', label: 'Подписчиков')),
+                  Expanded(child: _CounterItem(value: '${profile.reviewsCount}', label: s(context).statReviews)),
+                  Expanded(child: _CounterItem(value: '${profile.helpfulVotesCount}', label: s(context).usefulLabel)),
+                  Expanded(child: _CounterItem(value: '${profile.savedCount}', label: s(context).savedLabel)),
+                  Expanded(child: _CounterItem(value: '${profile.followersCount}', label: s(context).followersLabel)),
                 ],
               ),
               if (profile.reviewsCount > 0) ...[
                 const SizedBox(height: 16),
                 StatusBadge(
-                  statusLabel: profile.reviewsCount >= 10 ? 'Вы эксперт' : 'Новичок',
+                  statusLabel: profile.reviewsCount >= 10 ? s(context).expertBadge : s(context).noviceBadge,
                   currentPoints: profile.reviewsCount,
                   nextLevelPoints: 50,
-                  nextLevelLabel: 'До уровня «Гуру» — ещё ${(50 - profile.reviewsCount).clamp(0, 50)} отзывов',
+                  nextLevelLabel: s(context).toGuruLevel((50 - profile.reviewsCount).clamp(0, 50)),
                 ),
               ],
               const SizedBox(height: 8),
@@ -225,27 +253,28 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           labelColor: theme.colorScheme.primary,
           unselectedLabelColor: theme.textTheme.bodyMedium?.color,
           indicatorColor: theme.colorScheme.primary,
-          tabs: _tabs.map((t) => Tab(text: t)).toList(),
+          tabs: [
+            s(context).tabMyReviews,
+            s(context).tabSaved,
+            s(context).tabSubscriptions,
+            s(context).tabDrafts,
+          ].map((t) => Tab(text: t)).toList(),
         ),
         Expanded(
           child: TabBarView(
             controller: _tabController,
             children: [
               _buildMyReviewsTab(theme),
-              _buildEmptyTab(
-                icon: Icons.bookmark_border_rounded,
-                title: 'Смотрите на вкладке «Сохранено»',
-                subtitle: 'Все сохранённые места собраны в нижней навигации',
-              ),
+              _buildSavedTab(theme),
               _buildEmptyTab(
                 icon: Icons.group_outlined,
-                title: 'Нет подписок',
-                subtitle: 'Подписывайтесь на других пользователей, чтобы видеть их отзывы первыми',
+                title: s(context).noSubscriptionsTitle,
+                subtitle: s(context).noSubscriptionsSubtitle,
               ),
               _buildEmptyTab(
                 icon: Icons.edit_note_rounded,
-                title: 'Нет черновиков',
-                subtitle: 'Незаконченные отзывы будут сохраняться здесь автоматически',
+                title: s(context).noDraftsTitle,
+                subtitle: s(context).noDraftsSubtitle,
               ),
             ],
           ),
@@ -254,20 +283,77 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  static const _tabs = ['Мои отзывы', 'Сохранённое', 'Подписки', 'Черновики'];
-
   Widget _buildMyReviewsTab(ThemeData theme) {
     if (_myReviews.isEmpty) {
       return _buildEmptyTab(
         icon: Icons.rate_review_outlined,
-        title: 'Пока нет отзывов',
-        subtitle: 'Оставьте первый отзыв о месте, в котором были — это займёт меньше минуты',
+        title: s(context).noReviewsTitle,
+        subtitle: s(context).noReviewsSubtitle,
       );
     }
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       itemCount: _myReviews.length,
       itemBuilder: (context, i) => PlaceReviewCard(data: _myReviews[i]),
+    );
+  }
+
+  Widget _buildSavedTab(ThemeData theme) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: _SegmentButton(
+                  label: s(context).savedSubTabPlaces,
+                  selected: _savedSubTab == 0,
+                  onTap: () => setState(() => _savedSubTab = 0),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SegmentButton(
+                  label: s(context).savedSubTabReviews,
+                  selected: _savedSubTab == 1,
+                  onTap: () => setState(() => _savedSubTab = 1),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: _savedSubTab == 0 ? _buildSavedPlacesList(theme) : _buildSavedReviewsEmpty()),
+      ],
+    );
+  }
+
+  Widget _buildSavedPlacesList(ThemeData theme) {
+    if (_savedPlaces.isEmpty) {
+      return EmptyState(
+        icon: Icons.bookmark_border_rounded,
+        title: s(context).noSavedPlacesTitle,
+        subtitle: s(context).noSavedPlacesSubtitle,
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        itemCount: _savedPlaces.length,
+        itemBuilder: (context, i) {
+          final p = _savedPlaces[i];
+          return PlaceListTile(data: p, onTap: () => widget.onPlaceTap?.call(p));
+        },
+      ),
+    );
+  }
+
+  Widget _buildSavedReviewsEmpty() {
+    return EmptyState(
+      icon: Icons.rate_review_outlined,
+      title: s(context).noSavedReviewsTitle,
+      subtitle: s(context).noSavedReviewsSubtitle,
     );
   }
 
@@ -301,6 +387,7 @@ class _SettingsSheet extends StatelessWidget {
   final ValueChanged<AppThemeMode> onThemeModeChanged;
   final bool isSignedIn;
   final VoidCallback onSignOut;
+  final VoidCallback onFeedback;
 
   const _SettingsSheet({
     required this.language,
@@ -309,6 +396,7 @@ class _SettingsSheet extends StatelessWidget {
     required this.onThemeModeChanged,
     required this.isSignedIn,
     required this.onSignOut,
+    required this.onFeedback,
   });
 
   @override
@@ -332,7 +420,7 @@ class _SettingsSheet extends StatelessWidget {
               decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
             ),
           ),
-          Text('Язык интерфейса', style: theme.textTheme.titleMedium),
+          Text(s(context).languageSectionTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -354,13 +442,13 @@ class _SettingsSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Text('Тема оформления', style: theme.textTheme.titleMedium),
+          Text(s(context).themeSectionTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: _SegmentButton(
-                  label: 'Как в системе',
+                  label: s(context).themeSystem,
                   selected: themeMode == AppThemeMode.system,
                   onTap: () => onThemeModeChanged(AppThemeMode.system),
                 ),
@@ -372,7 +460,7 @@ class _SettingsSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: _SegmentButton(
-                  label: 'Светлая',
+                  label: s(context).themeLight,
                   icon: Icons.light_mode_rounded,
                   selected: themeMode == AppThemeMode.light,
                   onTap: () => onThemeModeChanged(AppThemeMode.light),
@@ -381,7 +469,7 @@ class _SettingsSheet extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _SegmentButton(
-                  label: 'Тёмная',
+                  label: s(context).themeDark,
                   icon: Icons.dark_mode_rounded,
                   selected: themeMode == AppThemeMode.dark,
                   onTap: () => onThemeModeChanged(AppThemeMode.dark),
@@ -389,14 +477,23 @@ class _SettingsSheet extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onFeedback,
+              icon: const Icon(Icons.flag_outlined),
+              label: Text(s(context).feedbackButton),
+            ),
+          ),
           if (isSignedIn) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onSignOut,
                 icon: const Icon(Icons.logout_rounded),
-                label: const Text('Выйти из аккаунта'),
+                label: Text(s(context).signOutButton),
               ),
             ),
           ],

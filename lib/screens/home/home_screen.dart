@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
 import '../../widgets/review_list_item.dart';
+import '../place/collections_list_screen.dart';
 import '../place/place_list_screen.dart';
+import '../profile/profile_screen.dart' show AppLanguage;
 
 class _CategoryItem {
-  final String label;
   final String key;
   final IconData icon;
-  const _CategoryItem(this.label, this.key, this.icon);
+  const _CategoryItem(this.key, this.icon);
 }
 
 const _categories = [
-  _CategoryItem('Рестораны', 'restaurant', Icons.restaurant_rounded),
-  _CategoryItem('Кафе', 'cafe', Icons.coffee_rounded),
-  _CategoryItem('Парки', 'park', Icons.park_rounded),
-  _CategoryItem('ТЦ', 'mall', Icons.storefront_rounded),
+  _CategoryItem('restaurant', Icons.restaurant_rounded),
+  _CategoryItem('cafe', Icons.coffee_rounded),
+  _CategoryItem('park', Icons.park_rounded),
+  _CategoryItem('mall', Icons.storefront_rounded),
 ];
 
 class CollectionData {
@@ -28,8 +30,9 @@ class CollectionData {
 }
 
 class HomeScreen extends StatefulWidget {
+  final AppLanguage language;
   final void Function(PlaceCardData place)? onPlaceTap;
-  const HomeScreen({super.key, this.onPlaceTap});
+  const HomeScreen({super.key, required this.language, this.onPlaceTap});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -60,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final results = await Future.wait([
         SupabaseService.fetchTrendingPlaces(),
-        SupabaseService.fetchRecentReviews(),
+        SupabaseService.fetchRecentReviews(language: widget.language),
         SupabaseService.fetchCollections(),
       ]);
       if (!mounted) return;
@@ -110,6 +113,15 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
   }
 
+  void _openAllCollections() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CollectionsListScreen(
+        collections: _collections,
+        onPlaceTap: (p) => widget.onPlaceTap?.call(p),
+      ),
+    ));
+  }
+
   void _openCollection(CollectionData collection) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PlaceListScreen(
@@ -131,9 +143,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Не удалось загрузить данные', style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+              Text(s(context).loadErrorGeneric, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _load, child: const Text('Повторить')),
+              ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
             ],
           ),
         ),
@@ -146,14 +158,14 @@ class _HomeScreenState extends State<HomeScreen> {
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(theme)),
           SliverToBoxAdapter(
-            child: _SectionTitle(title: 'Сейчас популярно', onSeeAll: _openAllTrending),
+            child: _SectionTitle(title: s(context).trendingTitle, onSeeAll: _openAllTrending),
           ),
           SliverToBoxAdapter(child: _buildTrendingRow()),
           SliverToBoxAdapter(child: _buildCategoryFilterHeader(theme)),
           if (_selectedCategory != null) _buildFilterResultsSliver(theme),
           if (!_isLoading && _recentReviews.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionTitle(title: 'Новые отзывы', onSeeAll: () {}),
+              child: _SectionTitle(title: s(context).recentReviewsTitle, onSeeAll: () {}),
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -168,11 +180,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           if (!_isLoading && _collections.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionTitle(title: 'Подборки для вас', onSeeAll: () {}),
+              child: _SectionTitle(title: s(context).collectionsTitle, onSeeAll: _openAllCollections),
             ),
             SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: 90)),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
     );
@@ -191,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Icon(Icons.location_on_rounded, size: 18, color: theme.colorScheme.primary),
                 const SizedBox(width: 4),
-                Text('Ташкент', style: theme.textTheme.titleMedium),
+                Text(s(context).cityName, style: theme.textTheme.titleMedium),
                 const SizedBox(width: 2),
                 Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: theme.textTheme.bodyMedium?.color),
               ],
@@ -211,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icon(Icons.search_rounded, color: theme.textTheme.bodyMedium?.color),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text('Найти место…', style: theme.textTheme.bodyMedium),
+                  child: Text(s(context).searchHint, style: theme.textTheme.bodyMedium),
                 ),
                 Icon(Icons.mic_none_rounded, color: theme.colorScheme.primary),
                 const SizedBox(width: 14),
@@ -235,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : _trending.isEmpty
               ? Center(
-                  child: Text('Пока нет мест', style: Theme.of(context).textTheme.bodyMedium),
+                  child: Text(s(context).noPlacesYet, style: Theme.of(context).textTheme.bodyMedium),
                 )
               : ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -258,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          child: Text('Категории', style: theme.textTheme.headlineMedium),
+          child: Text(s(context).categoriesTitle, style: theme.textTheme.headlineMedium),
         ),
         SizedBox(
           height: 84,
@@ -286,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      c.label,
+                      s(context).categoryPlural(c.key),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: isActive ? theme.colorScheme.primary : null,
                         fontWeight: isActive ? FontWeight.w700 : null,
@@ -315,7 +327,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Center(child: Text('В этой категории пока пусто', style: theme.textTheme.bodyMedium)),
+          child: Center(child: Text(s(context).categoryEmpty, style: theme.textTheme.bodyMedium)),
         ),
       );
     }
@@ -373,7 +385,7 @@ class _SectionTitle extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: theme.textTheme.headlineMedium),
-          TextButton(onPressed: onSeeAll, child: const Text('Все')),
+          TextButton(onPressed: onSeeAll, child: Text(s(context).seeAll)),
         ],
       ),
     );

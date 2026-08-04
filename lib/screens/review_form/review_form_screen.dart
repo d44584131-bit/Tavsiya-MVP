@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/place_card.dart';
@@ -20,7 +21,7 @@ class ReviewFormScreen extends StatefulWidget {
 
 class _ReviewFormScreenState extends State<ReviewFormScreen> {
   static const _maxChars = 500;
-  final _controller = PageController();
+  late final _controller = PageController(initialPage: widget.preselectedPlace != null ? 1 : 0);
   final _textController = TextEditingController();
   final _searchController = TextEditingController();
 
@@ -41,28 +42,27 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   bool _isSearchingPlaces = false;
   List<PlaceCardData> _placeResults = const [];
 
-  static const _steps = ['Место', 'Оценка', 'Детали', 'Готово'];
+  static const _stepCount = 4;
 
-  static const _newPlaceCategories = [
-    ('restaurant', 'Ресторан'),
-    ('cafe', 'Кафе'),
-    ('park', 'Парк'),
-    ('mall', 'ТЦ'),
-  ];
+  static const _newPlaceCategoryKeys = ['restaurant', 'cafe', 'park', 'mall'];
+  static const _priceLevelKeys = ['budget', 'mid', 'mid_high', 'high'];
+  static const _withWhomKeys = ['alone', 'partner', 'friends', 'family'];
 
-  static const _priceLevelValues = {
-    'до 50 000': 'budget',
-    '50–150 тыс': 'mid',
-    '150–300 тыс': 'mid_high',
-    '300 тыс+': 'high',
-  };
+  String _priceLabel(String key) => switch (key) {
+        'budget' => s(context).priceChip0,
+        'mid' => s(context).priceChip1,
+        'mid_high' => s(context).priceChip2,
+        'high' => s(context).priceChip3,
+        _ => key,
+      };
 
-  static const _withWhomValues = {
-    'Один(а)': 'alone',
-    'С партнёром': 'partner',
-    'С друзьями': 'friends',
-    'С семьёй': 'family',
-  };
+  String _withWhomLabel(String key) => switch (key) {
+        'alone' => s(context).withWhomAlone,
+        'partner' => s(context).withWhomPartner,
+        'friends' => s(context).withWhomFriends,
+        'family' => s(context).withWhomFamily,
+        _ => key,
+      };
 
   @override
   void initState() {
@@ -133,8 +133,8 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         text: _textController.text.trim(),
         pros: _prosController.text.trim().isEmpty ? null : _prosController.text.trim(),
         cons: _consController.text.trim().isEmpty ? null : _consController.text.trim(),
-        priceLevel: _priceChip == null ? null : _priceLevelValues[_priceChip],
-        withWhom: _withWhomChip == null ? null : _withWhomValues[_withWhomChip],
+        priceLevel: _priceChip,
+        withWhom: _withWhomChip,
         language: widget.language == AppLanguage.uz ? 'uz' : 'ru',
       );
       if (!mounted) return;
@@ -144,7 +144,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
-        _submitError = 'Не удалось отправить отзыв. Проверьте подключение и попробуйте снова';
+        _submitError = s(context).reviewSubmitError;
       });
     }
   }
@@ -154,7 +154,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Оставить отзыв'),
+        title: Text(s(context).leaveReview),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.maybePop(context),
@@ -185,12 +185,12 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       child: Row(
-        children: List.generate(_steps.length, (i) {
+        children: List.generate(_stepCount, (i) {
           final isActive = i <= _step;
           return Expanded(
             child: Container(
               height: 4,
-              margin: EdgeInsets.only(right: i == _steps.length - 1 ? 0 : 6),
+              margin: EdgeInsets.only(right: i == _stepCount - 1 ? 0 : 6),
               decoration: BoxDecoration(
                 color: isActive ? theme.colorScheme.primary : theme.dividerColor,
                 borderRadius: BorderRadius.circular(2),
@@ -210,7 +210,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('О каком месте отзыв?', style: theme.textTheme.headlineMedium),
+          Text(s(context).placeStepTitle, style: theme.textTheme.headlineMedium),
           const SizedBox(height: 16),
           Container(
             height: 50,
@@ -222,11 +222,11 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (_) => _onSearchChanged(),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: InputBorder.none,
-                prefixIcon: Icon(Icons.search_rounded),
-                hintText: 'Название места…',
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                prefixIcon: const Icon(Icons.search_rounded),
+                hintText: s(context).placeSearchHint,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
@@ -262,13 +262,11 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                   if (_newPlaceName != null) ...[
                     const SizedBox(height: 12),
                     ChipSelector(
-                      label: 'Категория места',
-                      options: _newPlaceCategories.map((c) => c.$2).toList(),
-                      selected: _newPlaceCategories
-                          .firstWhere((c) => c.$1 == _newPlaceCategory, orElse: () => ('', ''))
-                          .$2,
+                      label: s(context).placeCategoryLabel,
+                      options: _newPlaceCategoryKeys.map((k) => s(context).categoryLabel(k)).toList(),
+                      selected: _newPlaceCategory == null ? null : s(context).categoryLabel(_newPlaceCategory!),
                       onSelected: (label) => setState(() {
-                        _newPlaceCategory = _newPlaceCategories.firstWhere((c) => c.$2 == label).$1;
+                        _newPlaceCategory = _newPlaceCategoryKeys.firstWhere((k) => s(context).categoryLabel(k) == label);
                       }),
                     ),
                   ],
@@ -295,14 +293,14 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
           Center(
             child: Column(
               children: [
-                Text('Как оцените место?', style: theme.textTheme.bodyMedium),
+                Text(s(context).rateQuestion, style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 12),
                 StarRatingInput(value: _rating, onChanged: (v) => setState(() => _rating = v)),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          Text('Ваш отзыв', style: theme.textTheme.titleMedium),
+          Text(s(context).yourReviewLabel, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           TextField(
             controller: _textController,
@@ -310,7 +308,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             maxLines: 6,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Расскажите, что понравилось или нет…',
+              hintText: s(context).reviewHint,
               filled: true,
               fillColor: theme.cardColor,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
@@ -319,7 +317,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Text('Фото (по желанию)', style: theme.textTheme.titleMedium),
+          Text(s(context).photosOptionalLabel, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           SizedBox(
             height: 72,
@@ -352,7 +350,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              'Загрузка фото появится в одном из следующих обновлений',
+              s(context).photosComingSoon,
               style: theme.textTheme.labelSmall,
             ),
           ),
@@ -368,26 +366,26 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Что понравилось?', style: theme.textTheme.titleMedium?.copyWith(color: AppColors.positive)),
+          Text(s(context).prosQuestion, style: theme.textTheme.titleMedium?.copyWith(color: AppColors.positive)),
           const SizedBox(height: 8),
-          _buildProsConsField(theme, _prosController, AppColors.positive, 'Например: вкусно, быстро, приветливо'),
+          _buildProsConsField(theme, _prosController, AppColors.positive, s(context).prosHint),
           const SizedBox(height: 16),
-          Text('Что не понравилось?', style: theme.textTheme.titleMedium?.copyWith(color: AppColors.negative)),
+          Text(s(context).consQuestion, style: theme.textTheme.titleMedium?.copyWith(color: AppColors.negative)),
           const SizedBox(height: 8),
-          _buildProsConsField(theme, _consController, AppColors.negative, 'Например: долго ждали, шумно'),
+          _buildProsConsField(theme, _consController, AppColors.negative, s(context).consHint),
           const SizedBox(height: 24),
           ChipSelector(
-            label: 'Средний чек',
-            options: const ['до 50 000', '50–150 тыс', '150–300 тыс', '300 тыс+'],
-            selected: _priceChip,
-            onSelected: (v) => setState(() => _priceChip = v),
+            label: s(context).avgCheckLabel,
+            options: _priceLevelKeys.map(_priceLabel).toList(),
+            selected: _priceChip == null ? null : _priceLabel(_priceChip!),
+            onSelected: (label) => setState(() => _priceChip = _priceLevelKeys.firstWhere((k) => _priceLabel(k) == label)),
           ),
           const SizedBox(height: 20),
           ChipSelector(
-            label: 'С кем были',
-            options: const ['Один(а)', 'С партнёром', 'С друзьями', 'С семьёй'],
-            selected: _withWhomChip,
-            onSelected: (v) => setState(() => _withWhomChip = v),
+            label: s(context).withWhomLabel,
+            options: _withWhomKeys.map(_withWhomLabel).toList(),
+            selected: _withWhomChip == null ? null : _withWhomLabel(_withWhomChip!),
+            onSelected: (label) => setState(() => _withWhomChip = _withWhomKeys.firstWhere((k) => _withWhomLabel(k) == label)),
           ),
           if (_submitError != null) ...[
             const SizedBox(height: 16),
@@ -430,10 +428,10 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
               child: Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 48),
             ),
             const SizedBox(height: 20),
-            Text('Отзыв отправлен!', style: theme.textTheme.headlineMedium, textAlign: TextAlign.center),
+            Text(s(context).reviewPublishedTitle, style: theme.textTheme.headlineMedium, textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Он будет опубликован после проверки модератором — обычно это занимает не больше суток',
+              s(context).reviewPublishedSubtitle,
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -442,7 +440,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.maybePop(context),
-                child: const Text('Готово'),
+                child: Text(s(context).stepDone),
               ),
             ),
           ],
@@ -464,22 +462,13 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
         children: [
-          if (isLastEditableStep)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                'Отзыв будет проверен модератором перед публикацией',
-                style: theme.textTheme.labelSmall,
-                textAlign: TextAlign.center,
-              ),
-            ),
           Row(
             children: [
               if (_step > 0)
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => _goTo(_step - 1),
-                    child: const Text('Назад'),
+                    child: Text(s(context).backButton),
                   ),
                 ),
               if (_step > 0) const SizedBox(width: 12),
@@ -501,7 +490,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(isLastEditableStep ? 'Опубликовать' : 'Далее'),
+                      : Text(isLastEditableStep ? s(context).publishButton : s(context).nextButton),
                 ),
               ),
             ],
@@ -540,7 +529,7 @@ class _PlaceOption extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  isNew ? 'Добавить «$name»' : name,
+                  isNew ? s(context).addPlaceLabel(name) : name,
                   style: theme.textTheme.bodyLarge,
                 ),
               ),

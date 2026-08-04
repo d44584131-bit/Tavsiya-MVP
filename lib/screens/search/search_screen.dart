@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/empty_state.dart';
@@ -22,13 +23,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _hasError = false;
   List<PlaceCardData> _results = const [];
 
-  static const _categories = [
-    (null, 'Все'),
-    ('restaurant', 'Рестораны'),
-    ('cafe', 'Кафе'),
-    ('park', 'Парки'),
-    ('mall', 'ТЦ'),
-  ];
+  static const _categoryKeys = [null, 'restaurant', 'cafe', 'park', 'mall'];
 
   @override
   void initState() {
@@ -78,7 +73,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Поиск')),
+      appBar: AppBar(title: Text(s(context).searchTitle)),
       body: Column(
         children: [
           Padding(
@@ -93,11 +88,11 @@ class _SearchScreenState extends State<SearchScreen> {
               child: TextField(
                 controller: _controller,
                 onChanged: (_) => _onQueryChanged(),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: InputBorder.none,
-                  prefixIcon: Icon(Icons.search_rounded),
-                  hintText: 'Найти место…',
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintText: s(context).searchHint,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
             ),
@@ -107,10 +102,11 @@ class _SearchScreenState extends State<SearchScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _categories.length,
+              itemCount: _categoryKeys.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, i) {
-                final (key, label) = _categories[i];
+                final key = _categoryKeys[i];
+                final label = key == null ? s(context).allCategories : s(context).categoryPlural(key);
                 final isActive = _categoryFilter == key;
                 return GestureDetector(
                   onTap: () => setState(() {
@@ -157,23 +153,23 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Не удалось загрузить результаты', style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+              Text(s(context).searchLoadError, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _search, child: const Text('Повторить')),
+              ElevatedButton(onPressed: _search, child: Text(s(context).retry)),
             ],
           ),
         ),
       );
     }
     if (_results.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.search_off_rounded,
-        title: 'Ничего не найдено',
-        subtitle: 'Попробуйте изменить запрос или выбрать другую категорию',
+        title: s(context).nothingFound,
+        subtitle: s(context).nothingFoundHint,
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       itemCount: _results.length,
       itemBuilder: (context, i) {
         final p = _results[i];
@@ -218,7 +214,7 @@ class _SearchResultTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(data.name, style: theme.textTheme.titleMedium),
-                  Text('${data.categoryLabel} · ${data.district}', style: theme.textTheme.labelSmall),
+                  Text('${s(context).categoryLabel(data.category)} · ${data.district}', style: theme.textTheme.labelSmall),
                 ],
               ),
             ),

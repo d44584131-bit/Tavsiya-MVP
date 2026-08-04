@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'l10n/strings.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/place/place_detail_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -17,8 +19,6 @@ class SupabaseService {
   }
 
   static SupabaseClient get _client => Supabase.instance.client;
-
-  static const _categoryLabels = {'restaurant': 'Ресторан', 'cafe': 'Кафе', 'park': 'Парк', 'mall': 'ТЦ'};
 
   // ------------------------------------------------------------
   // Аутентификация
@@ -40,25 +40,38 @@ class SupabaseService {
     await _client.auth.signOut();
   }
 
+  /// Вход/регистрация через Google. На вебе браузер сам вернётся на текущий
+  /// адрес после подтверждения; на Android/iOS — через deep link
+  /// 'com.example.tavsiya://login-callback/' (см. AndroidManifest.xml /
+  /// Info.plist). Требует включённого провайдера Google в Supabase Dashboard
+  /// (Authentication → Providers) с Client ID/Secret из Google Cloud Console.
+  static Future<void> signInWithGoogle() async {
+    await _client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: kIsWeb ? null : 'com.example.tavsiya://login-callback/',
+    );
+  }
+
   /// Собственные отзывы текущего пользователя (вкладка "Мои отзывы" в профиле),
   /// включая ещё не прошедшие модерацию.
-  static Future<List<PlaceReviewData>> fetchMyReviews() async {
+  static Future<List<PlaceReviewData>> fetchMyReviews({required AppLanguage language}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
 
     final rows = await _client
         .from('reviews')
-        .select('rating, text, pros, cons')
+        .select('rating, text, pros, cons, status, places(name)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
     return (rows as List)
         .map((r) => PlaceReviewData(
-              authorName: 'Вы',
+              authorName: (r['places'] as Map<String, dynamic>?)?['name'] as String? ?? Strings(language).placeDeleted,
               stars: r['rating'] as int,
               text: r['text'] as String,
               pros: r['pros'] as String?,
               cons: r['cons'] as String?,
+              isPending: r['status'] != 'approved',
             ))
         .toList();
   }
@@ -143,7 +156,6 @@ class SupabaseService {
       id: row['id'] as String,
       name: row['name'] as String,
       category: row['category'] as String,
-      categoryLabel: _categoryLabels[row['category']] ?? row['category'] as String,
       description: row['description'] as String?,
       address: row['address'] as String?,
       district: (row['district'] as String?) ?? '',
@@ -162,7 +174,6 @@ class SupabaseService {
       id: r['id'] as String,
       name: r['name'] as String,
       category: r['category'] as String,
-      categoryLabel: _categoryLabels[r['category']] ?? r['category'] as String,
       rating: (r['rating_avg'] as num).toDouble(),
       reviewsCount: r['reviews_count'] as int,
       district: (r['district'] as String?) ?? '',
@@ -194,29 +205,33 @@ class SupabaseService {
 
   /// Отзывы места — только approved, независимо от языка интерфейса
   /// (см. правило многоязычности: отзывы не фильтруются по языку).
-  static Future<List<PlaceReviewData>> fetchApprovedReviews(String placeId, {int limit = 20}) async {
-    final rows = await _client
+  static Future<List<PlaceReviewData>> fetchApprovedReviews(String placeId, {required AppLanguage language, int limit = 20}) async {
+    final userId = _client.auth.currentUser?.id;
+    var builder = _client
         .from('reviews')
-        .select('rating, text, pros, cons, profiles!reviews_user_id_fkey(display_name)')
-        .eq('place_id', placeId)
-        .eq('status', 'approved')
-        .order('created_at', ascending: false)
-        .limit(limit);
+        .select('rating, text, pros, cons, status, profiles!reviews_user_id_fkey(display_name)')
+        .eq('place_id', placeId);
+    // approved-отзывы видны всем; собственный ещё не прошедший модерацию
+    // отзыв — только автору (см. RLS reviews_select_approved_or_own).
+    builder = userId != null ? builder.or('status.eq.approved,user_id.eq.$userId') : builder.eq('status', 'approved');
+
+    final rows = await builder.order('created_at', ascending: false).limit(limit);
 
     return (rows as List).map((r) {
       final profile = r['profiles'] as Map<String, dynamic>?;
       return PlaceReviewData(
-        authorName: (profile?['display_name'] as String?) ?? 'Гость',
+        authorName: (profile?['display_name'] as String?) ?? Strings(language).guestReviewer,
         stars: r['rating'] as int,
         text: r['text'] as String,
         pros: r['pros'] as String?,
         cons: r['cons'] as String?,
+        isPending: r['status'] != 'approved',
       );
     }).toList();
   }
 
   /// "Новые отзывы" на главном экране — последние approved-отзывы по всем местам.
-  static Future<List<ReviewListItemData>> fetchRecentReviews({int limit = 10}) async {
+  static Future<List<ReviewListItemData>> fetchRecentReviews({required AppLanguage language, int limit = 10}) async {
     final rows = await _client
         .from('reviews')
         .select('rating, text, profiles!reviews_user_id_fkey(display_name), places(name)')
@@ -228,7 +243,7 @@ class SupabaseService {
       final profile = r['profiles'] as Map<String, dynamic>?;
       final place = r['places'] as Map<String, dynamic>?;
       return ReviewListItemData(
-        authorName: (profile?['display_name'] as String?) ?? 'Гость',
+        authorName: (profile?['display_name'] as String?) ?? Strings(language).guestReviewer,
         placeName: (place?['name'] as String?) ?? '',
         stars: r['rating'] as int,
         text: r['text'] as String,
@@ -236,7 +251,10 @@ class SupabaseService {
     }).toList();
   }
 
-  /// Публикация нового отзыва — создаётся со статусом 'pending' (см. schema.sql).
+  /// Публикация нового отзыва — на этапе тестирования MVP публикуется сразу
+  /// со статусом 'approved' (модерация отключена, чтобы тестерам не ждать
+  /// ручного одобрения). Статус 'pending'/'rejected' остаётся в схеме и
+  /// поддерживается в UI — ими можно управлять вручную через Supabase.
   static Future<void> submitReview({
     required String placeId,
     required int rating,
@@ -260,7 +278,7 @@ class SupabaseService {
       'price_level': priceLevel,
       'with_whom': withWhom,
       'language': language,
-      'status': 'pending',
+      'status': 'approved',
     });
   }
 

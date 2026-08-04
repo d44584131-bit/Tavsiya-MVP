@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'l10n/app_language_scope.dart';
 import 'theme/app_theme.dart';
 import 'screens/onboarding/language_select_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/root/app_shell.dart';
+import 'services/feedback_service.dart';
 import 'supabase_service.dart';
 
 const _prefsLanguageKey = 'tavsiya.language';
@@ -20,6 +22,11 @@ const _supabasePublishableKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
   defaultValue: 'sb_publishable_OQFxO-6n7SumrvtLvG3wTA_npglNvgn',
 );
+// Домен веб-сборки на Vercel — туда же ведёт api/feedback.js (жалобы/предложения).
+const _feedbackApiBaseUrl = String.fromEnvironment(
+  'FEEDBACK_API_BASE_URL',
+  defaultValue: 'https://tavsiya-mvp.vercel.app',
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +34,7 @@ void main() async {
     url: _supabaseUrl,
     publishableKey: _supabasePublishableKey,
   );
+  FeedbackService.init(baseUrl: _feedbackApiBaseUrl);
 
   final prefs = await SharedPreferences.getInstance();
   final onboardingDone = prefs.getBool(_prefsOnboardingDoneKey) ?? false;
@@ -78,31 +86,32 @@ class _TavsiyaAppState extends State<TavsiyaApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Tavsiya',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: _materialThemeMode,
-      // NB: локализация интерфейса (RU/UZ) через ARB/intl подключается отдельно;
-      // здесь _language прокидывается в экраны, которые уже умеют на него реагировать.
-      home: switch (_flow) {
-        _Flow.language => LanguageSelectScreen(
-            onSelected: (lang) {
-              _setLanguage(lang);
-              setState(() => _flow = _Flow.onboarding);
-            },
-          ),
-        _Flow.onboarding => OnboardingScreen(
-            onFinish: _finishOnboarding,
-          ),
-        _Flow.main => AppShell(
-            language: _language,
-            themeMode: _themeMode,
-            onLanguageChanged: _setLanguage,
-            onThemeModeChanged: (mode) => setState(() => _themeMode = mode),
-          ),
-      },
+    return AppLanguageScope(
+      language: _language,
+      child: MaterialApp(
+        title: 'Tavsiya',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: _materialThemeMode,
+        home: switch (_flow) {
+          _Flow.language => LanguageSelectScreen(
+              onSelected: (lang) {
+                _setLanguage(lang);
+                setState(() => _flow = _Flow.onboarding);
+              },
+            ),
+          _Flow.onboarding => OnboardingScreen(
+              onFinish: _finishOnboarding,
+            ),
+          _Flow.main => AppShell(
+              language: _language,
+              themeMode: _themeMode,
+              onLanguageChanged: _setLanguage,
+              onThemeModeChanged: (mode) => setState(() => _themeMode = mode),
+            ),
+        },
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/dot_indicator.dart';
 
@@ -21,9 +22,9 @@ class OnboardingPageData {
 }
 
 class _CategoryChip {
-  final String label;
+  final String categoryKey; // 'restaurant' | 'cafe' | 'park' | 'mall' — метка переводится на месте
   final IconData icon;
-  const _CategoryChip(this.label, this.icon);
+  const _CategoryChip(this.categoryKey, this.icon);
 }
 
 class _ReviewSnippet {
@@ -46,38 +47,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
   int _index = 0;
 
-  static const _pages = [
-    OnboardingPageData(
-      titlePrefix: 'Находи лучшие места ',
-      titleAccent: 'рядом с тобой',
-      subtitle: 'Рестораны, кафе, парки и торговые центры Ташкента — с честными отзывами настоящих людей',
-      illustrationIcon: Icons.explore_outlined,
-    ),
-    OnboardingPageData(
-      titlePrefix: 'Выбирай ',
-      titleAccent: 'по категориям',
-      subtitle: 'Всё, что интересно именно тебе',
-      illustrationIcon: Icons.grid_view_rounded,
-      categories: [
-        _CategoryChip('Рестораны', Icons.restaurant_rounded),
-        _CategoryChip('Кафе', Icons.coffee_rounded),
-        _CategoryChip('Парки', Icons.park_rounded),
-        _CategoryChip('ТЦ', Icons.storefront_rounded),
-      ],
-    ),
-    OnboardingPageData(
-      titlePrefix: 'Доверяй ',
-      titleAccent: 'реальным отзывам',
-      subtitle: 'Тысячи оценок от жителей города',
-      illustrationIcon: Icons.rate_review_rounded,
-      reviews: [
-        _ReviewSnippet('Атмосфера просто огонь, обязательно вернёмся', 5),
-        _ReviewSnippet('Отличное место для семейного отдыха', 4),
-      ],
-    ),
-  ];
+  List<OnboardingPageData> _pages(BuildContext context) => [
+        OnboardingPageData(
+          titlePrefix: s(context).onboard1TitlePrefix,
+          titleAccent: s(context).onboard1TitleAccent,
+          subtitle: s(context).onboard1Subtitle,
+          illustrationIcon: Icons.explore_outlined,
+        ),
+        OnboardingPageData(
+          titlePrefix: s(context).onboard2TitlePrefix,
+          titleAccent: s(context).onboard2TitleAccent,
+          subtitle: s(context).onboard2Subtitle,
+          illustrationIcon: Icons.grid_view_rounded,
+          categories: const [
+            _CategoryChip('restaurant', Icons.restaurant_rounded),
+            _CategoryChip('cafe', Icons.coffee_rounded),
+            _CategoryChip('park', Icons.park_rounded),
+            _CategoryChip('mall', Icons.storefront_rounded),
+          ],
+        ),
+        OnboardingPageData(
+          titlePrefix: s(context).onboard3TitlePrefix,
+          titleAccent: s(context).onboard3TitleAccent,
+          subtitle: s(context).onboard3Subtitle,
+          illustrationIcon: Icons.rate_review_rounded,
+          reviews: [
+            _ReviewSnippet(s(context).onboardReview1, 5),
+            _ReviewSnippet(s(context).onboardReview2, 4),
+          ],
+        ),
+      ];
 
-  bool get _isLast => _index == _pages.length - 1;
+  bool get _isLast => _index == _pages(context).length - 1;
 
   void _next() {
     if (_isLast) {
@@ -90,6 +91,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pages = _pages(context);
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -103,7 +105,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: TextButton(
                       onPressed: widget.onFinish,
                       child: Text(
-                        'Пропустить',
+                        s(context).skip,
                         style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
                       ),
                     ),
@@ -112,14 +114,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Expanded(
                   child: PageView.builder(
                     controller: _controller,
-                    itemCount: _pages.length,
+                    itemCount: pages.length,
                     onPageChanged: (i) => setState(() => _index = i),
-                    itemBuilder: (context, i) => _OnboardingPage(data: _pages[i], isDark: isDark),
+                    itemBuilder: (context, i) => _OnboardingPage(data: pages[i], isDark: isDark),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: DotIndicator(count: _pages.length, activeIndex: _index),
+                  child: DotIndicator(count: pages.length, activeIndex: _index),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -127,7 +129,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _next,
-                      child: Text(_isLast ? 'Начать' : 'Далее'),
+                      child: Text(_isLast ? s(context).startButton : s(context).nextButton),
                     ),
                   ),
                 ),
@@ -136,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     padding: const EdgeInsets.only(bottom: 20),
                     child: TextButton(
                       onPressed: widget.onFinish,
-                      child: const Text('У меня уже есть аккаунт'),
+                      child: Text(s(context).alreadyHaveAccount),
                     ),
                   ),
               ],
@@ -293,7 +295,7 @@ class _CategoryCell extends StatelessWidget {
           child: Icon(chip.icon, color: theme.colorScheme.primary),
         ),
         const SizedBox(height: 6),
-        Text(chip.label, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
+        Text(s(context).categoryPlural(chip.categoryKey), style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
       ],
     );
   }

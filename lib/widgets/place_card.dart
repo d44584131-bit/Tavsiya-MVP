@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
 
 class PlaceCardData {
   final String id;
   final String name;
   final String category; // 'restaurant' | 'cafe' | 'park' | 'mall'
-  final String categoryLabel;
   final double rating;
   final int reviewsCount;
   final String district;
@@ -14,7 +14,6 @@ class PlaceCardData {
     required this.id,
     required this.name,
     required this.category,
-    required this.categoryLabel,
     required this.rating,
     required this.reviewsCount,
     required this.district,
@@ -100,7 +99,7 @@ class PlaceCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      data.categoryLabel,
+                      s(context).categoryLabel(data.category),
                       style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ),

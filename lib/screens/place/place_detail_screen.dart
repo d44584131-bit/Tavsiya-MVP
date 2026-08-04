@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/stat_tile.dart';
+import '../../widgets/place_card.dart';
 import '../../widgets/place_review_card.dart';
 import '../auth/auth_screen.dart';
+import '../profile/profile_screen.dart' show AppLanguage;
 
 class PlaceDetailData {
   final String id;
   final String name;
   final String category; // 'restaurant' | 'cafe' | 'park' | 'mall'
-  final String categoryLabel;
   final String? description;
   final String? address;
   final String district;
@@ -25,7 +27,6 @@ class PlaceDetailData {
     required this.id,
     required this.name,
     required this.category,
-    required this.categoryLabel,
     this.description,
     this.address,
     required this.district,
@@ -50,7 +51,9 @@ class PlaceDetailData {
 
 class PlaceDetailScreen extends StatefulWidget {
   final String placeId;
-  const PlaceDetailScreen({super.key, required this.placeId});
+  final AppLanguage language;
+  final Future<void> Function(PlaceCardData place) onLeaveReview;
+  const PlaceDetailScreen({super.key, required this.placeId, required this.language, required this.onLeaveReview});
 
   @override
   State<PlaceDetailScreen> createState() => _PlaceDetailScreenState();
@@ -67,8 +70,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   bool _isSaved = false;
   bool _isTogglingSave = false;
 
-  static const _tabs = ['Обзор', 'Отзывы', 'Фото', 'Информация'];
-
   @override
   void initState() {
     super.initState();
@@ -83,7 +84,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
     try {
       final results = await Future.wait([
         SupabaseService.fetchPlaceById(widget.placeId),
-        SupabaseService.fetchApprovedReviews(widget.placeId),
+        SupabaseService.fetchApprovedReviews(widget.placeId, language: widget.language),
         SupabaseService.isPlaceSaved(widget.placeId),
       ]);
       if (!mounted) return;
@@ -96,7 +97,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Не удалось загрузить место. Проверьте подключение и попробуйте снова.';
+        _error = s(context).placeLoadError;
         _isLoading = false;
       });
     }
@@ -118,7 +119,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
       if (!mounted) return;
       setState(() => _isSaved = !next);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось сохранить место, попробуйте ещё раз')),
+        SnackBar(content: Text(s(context).saveError)),
       );
     } finally {
       if (mounted) setState(() => _isTogglingSave = false);
@@ -139,9 +140,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_error ?? 'Место не найдено', textAlign: TextAlign.center),
+                Text(_error ?? s(context).placeNotFound, textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                ElevatedButton(onPressed: _load, child: const Text('Повторить')),
+                ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
               ],
             ),
           ),
@@ -154,6 +155,16 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await widget.onLeaveReview(_toCardData(place));
+          // после публикации отзыва подгружаем карточку места заново, чтобы
+          // новый отзыв сразу появился в списке, не дожидаясь ручного refresh
+          if (mounted) _load();
+        },
+        icon: const Icon(Icons.rate_review_rounded),
+        label: Text(s(context).leaveReview),
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -196,12 +207,12 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
                           color: Colors.black.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.verified_rounded, size: 14, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('Подтверждено', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                            const Icon(Icons.verified_rounded, size: 14, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(s(context).verifiedBadge, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -224,7 +235,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
                       const SizedBox(width: 4),
                       Text(place.rating.toStringAsFixed(1), style: theme.textTheme.titleMedium),
                       const SizedBox(width: 4),
-                      Text('(${place.reviewsCount} отзывов) · ${place.district}', style: theme.textTheme.labelSmall),
+                      Text('(${s(context).reviewsCount(place.reviewsCount)}) · ${place.district}', style: theme.textTheme.labelSmall),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -238,7 +249,12 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
           ),
           SliverPersistentHeader(
             pinned: true,
-            delegate: _TabBarDelegate(_tabController, _tabs),
+            delegate: _TabBarDelegate(_tabController, [
+              s(context).tabOverview,
+              s(context).tabReviews,
+              s(context).tabPhotos,
+              s(context).tabInfo,
+            ]),
           ),
           SliverFillRemaining(
             hasScrollBody: true,
@@ -257,15 +273,24 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
     );
   }
 
+  PlaceCardData _toCardData(PlaceDetailData d) => PlaceCardData(
+        id: d.id,
+        name: d.name,
+        category: d.category,
+        rating: d.rating,
+        reviewsCount: d.reviewsCount,
+        district: d.district,
+      );
+
   Widget _buildQuickActions(ThemeData theme, PlaceDetailData place) {
     return Row(
       children: [
-        _QuickAction(icon: Icons.call_rounded, label: 'Позвонить', onTap: () {}),
-        _QuickAction(icon: Icons.directions_rounded, label: 'Маршрут', onTap: () {}),
-        _QuickAction(icon: Icons.language_rounded, label: 'Сайт', onTap: () {}),
+        _QuickAction(icon: Icons.call_rounded, label: s(context).callAction, onTap: () {}),
+        _QuickAction(icon: Icons.directions_rounded, label: s(context).routeAction, onTap: () {}),
+        _QuickAction(icon: Icons.language_rounded, label: s(context).websiteAction, onTap: () {}),
         _QuickAction(
           icon: _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-          label: 'Сохранить',
+          label: s(context).saveAction,
           active: _isSaved,
           onTap: _isTogglingSave ? null : _toggleSaved,
         ),
@@ -276,25 +301,25 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   Widget _buildStatsRow(PlaceDetailData place) {
     return Row(
       children: [
-        Expanded(child: StatTile(icon: Icons.star_rounded, value: place.rating.toStringAsFixed(1), label: 'Рейтинг')),
+        Expanded(child: StatTile(icon: Icons.star_rounded, value: place.rating.toStringAsFixed(1), label: s(context).statRating)),
         const SizedBox(width: 10),
-        Expanded(child: StatTile(icon: Icons.forum_rounded, value: '${place.reviewsCount}', label: 'Отзывов')),
+        Expanded(child: StatTile(icon: Icons.forum_rounded, value: '${place.reviewsCount}', label: s(context).statReviews)),
         const SizedBox(width: 10),
-        Expanded(child: StatTile(icon: Icons.photo_camera_rounded, value: '${place.photosCount}', label: 'Фото')),
+        Expanded(child: StatTile(icon: Icons.photo_camera_rounded, value: '${place.photosCount}', label: s(context).statPhotos)),
         const SizedBox(width: 10),
-        Expanded(child: StatTile(icon: Icons.payments_rounded, value: place.priceLevelLabel, label: 'Цена')),
+        Expanded(child: StatTile(icon: Icons.payments_rounded, value: place.priceLevelLabel, label: s(context).statPrice)),
       ],
     );
   }
 
   Widget _buildOverviewTab(ThemeData theme, PlaceDetailData place) {
-    final about = place.description ?? 'Описание места пока не добавлено.';
+    final about = place.description ?? s(context).noDescription;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('О месте', style: theme.textTheme.titleMedium),
+          Text(s(context).aboutTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           AnimatedSize(
             duration: const Duration(milliseconds: 250),
@@ -312,7 +337,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
               child: Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  _aboutExpanded ? 'Свернуть' : 'Читать далее',
+                  _aboutExpanded ? s(context).collapse : s(context).readMore,
                   style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -321,16 +346,16 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Последние отзывы', style: theme.textTheme.titleMedium),
+              Text(s(context).recentReviewsShort, style: theme.textTheme.titleMedium),
               TextButton(
                 onPressed: () => _tabController.animateTo(1),
-                child: const Text('Все'),
+                child: Text(s(context).seeAll),
               ),
             ],
           ),
           const SizedBox(height: 8),
           if (_reviews.isEmpty)
-            Text('Пока нет отзывов — станьте первым', style: theme.textTheme.bodyMedium)
+            Text(s(context).noReviewsYet, style: theme.textTheme.bodyMedium)
           else
             ..._reviews.take(2).map((r) => PlaceReviewCard(data: r)),
         ],
@@ -341,7 +366,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   Widget _buildReviewsTab(ThemeData theme) {
     if (_reviews.isEmpty) {
       return Center(
-        child: Text('Пока нет отзывов — станьте первым', style: theme.textTheme.bodyMedium),
+        child: Text(s(context).noReviewsYet, style: theme.textTheme.bodyMedium),
       );
     }
     return ListView.builder(
@@ -354,7 +379,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   Widget _buildPhotosTab(ThemeData theme, PlaceDetailData place) {
     if (place.photosCount == 0) {
       return Center(
-        child: Text('Фото пока не добавлены', style: theme.textTheme.bodyMedium),
+        child: Text(s(context).noPhotosYet, style: theme.textTheme.bodyMedium),
       );
     }
     return GridView.builder(
@@ -377,10 +402,10 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
 
   Widget _buildInfoTab(ThemeData theme, PlaceDetailData place) {
     final rows = [
-      (Icons.place_rounded, 'Адрес', place.address ?? 'Не указан'),
-      (Icons.phone_rounded, 'Телефон', place.phone ?? 'Не указан'),
-      (Icons.language_rounded, 'Сайт', place.website ?? 'Не указан'),
-      (Icons.payments_rounded, 'Средний чек', place.priceLevelLabel),
+      (Icons.place_rounded, s(context).infoAddress, place.address ?? s(context).notSpecified),
+      (Icons.phone_rounded, s(context).infoPhone, place.phone ?? s(context).notSpecified),
+      (Icons.language_rounded, s(context).infoWebsite, place.website ?? s(context).notSpecified),
+      (Icons.payments_rounded, s(context).infoAvgCheck, place.priceLevelLabel),
     ];
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),

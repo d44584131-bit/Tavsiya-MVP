@@ -322,8 +322,18 @@ create trigger trg_saved_places_recalc
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
+  -- 'display_name' — из формы регистрации по email; 'full_name'/'name' —
+  -- то, что присылает Google OAuth в raw_user_meta_data.
   insert into public.profiles (id, display_name)
-  values (new.id, coalesce(new.raw_user_meta_data ->> 'display_name', 'Новый пользователь'));
+  values (
+    new.id,
+    coalesce(
+      new.raw_user_meta_data ->> 'display_name',
+      new.raw_user_meta_data ->> 'full_name',
+      new.raw_user_meta_data ->> 'name',
+      'Новый пользователь'
+    )
+  );
   return new;
 end;
 $$;

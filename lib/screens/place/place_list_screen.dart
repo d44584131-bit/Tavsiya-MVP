@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/strings.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
@@ -67,19 +68,19 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Не удалось загрузить места', textAlign: TextAlign.center),
+              Text(s(context).placesLoadError, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _load, child: const Text('Повторить')),
+              ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
             ],
           ),
         ),
       );
     }
     if (_places.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.search_off_rounded,
-        title: 'Пока пусто',
-        subtitle: 'Здесь пока нет мест',
+        title: s(context).emptyListTitle,
+        subtitle: s(context).emptyListSubtitle,
       );
     }
     return ListView.builder(

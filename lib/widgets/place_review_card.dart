@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
 
 class PlaceReviewData {
@@ -8,6 +9,7 @@ class PlaceReviewData {
   final int photosCount; // сколько фото приложено (заглушки-квадраты)
   final String? pros;
   final String? cons;
+  final bool isPending; // отзыв виден только автору, пока не пройдёт модерацию
 
   const PlaceReviewData({
     required this.authorName,
@@ -16,6 +18,7 @@ class PlaceReviewData {
     this.photosCount = 0,
     this.pros,
     this.cons,
+    this.isPending = false,
   });
 }
 
@@ -66,6 +69,15 @@ class PlaceReviewCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (data.isPending)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentOrange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(s(context).pendingBadge, style: const TextStyle(fontSize: 11, color: AppColors.accentOrange, fontWeight: FontWeight.w600)),
+                ),
             ],
           ),
           const SizedBox(height: 10),
