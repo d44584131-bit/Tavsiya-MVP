@@ -26,22 +26,38 @@ class CollectionData {
   final String id;
   final String title;
   final List<PlaceCardData> places;
-  const CollectionData({required this.id, required this.title, required this.places});
+  const CollectionData(
+      {required this.id, required this.title, required this.places});
 }
 
 class HomeScreen extends StatefulWidget {
   final AppLanguage language;
   final void Function(PlaceCardData place)? onPlaceTap;
-  const HomeScreen({super.key, required this.language, this.onPlaceTap});
+  final VoidCallback? onOpenSearch;
+  final String selectedCity;
+  final ValueChanged<String>? onCityChanged;
+  const HomeScreen({
+    super.key,
+    required this.language,
+    this.onPlaceTap,
+    this.onOpenSearch,
+    this.selectedCity = kDefaultCity,
+    this.onCityChanged,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _trendingPageSize = 10;
+
   bool _isLoading = true;
   bool _hasError = false;
   List<PlaceCardData> _trending = const [];
+  bool _hasMoreTrending = true;
+  bool _isLoadingMoreTrending = false;
+  final _trendingScrollController = ScrollController();
   List<ReviewListItemData> _recentReviews = const [];
   List<CollectionData> _collections = const [];
 
@@ -52,7 +68,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _trendingScrollController.addListener(_onTrendingScroll);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _trendingScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -62,13 +85,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final results = await Future.wait([
-        SupabaseService.fetchTrendingPlaces(),
+        SupabaseService.fetchTrendingPlaces(limit: _trendingPageSize),
         SupabaseService.fetchRecentReviews(language: widget.language),
         SupabaseService.fetchCollections(),
       ]);
       if (!mounted) return;
+      final trending = results[0] as List<PlaceCardData>;
       setState(() {
-        _trending = results[0] as List<PlaceCardData>;
+        _trending = trending;
+        _hasMoreTrending = trending.length == _trendingPageSize;
         _recentReviews = results[1] as List<ReviewListItemData>;
         _collections = results[2] as List<CollectionData>;
         _isLoading = false;
@@ -79,6 +104,33 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasError = true;
         _isLoading = false;
       });
+    }
+  }
+
+  void _onTrendingScroll() {
+    if (!_hasMoreTrending || _isLoadingMoreTrending || _isLoading) return;
+    if (_trendingScrollController.position.pixels >
+        _trendingScrollController.position.maxScrollExtent - 300) {
+      _loadMoreTrending();
+    }
+  }
+
+  Future<void> _loadMoreTrending() async {
+    setState(() => _isLoadingMoreTrending = true);
+    try {
+      final more = await SupabaseService.fetchTrendingPlaces(
+        offset: _trending.length,
+        limit: _trendingPageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _trending = [..._trending, ...more];
+        _hasMoreTrending = more.length == _trendingPageSize;
+        _isLoadingMoreTrending = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingMoreTrending = false);
     }
   }
 
@@ -106,8 +158,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openAllTrending() {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PlaceListScreen(
-        title: 'Сейчас популярно',
-        fetcher: () => SupabaseService.fetchTrendingPlaces(limit: 50),
+        title: s(context).trendingTitle,
+        fetcher: ({required offset, required limit}) =>
+            SupabaseService.fetchTrendingPlaces(offset: offset, limit: limit),
         onPlaceTap: (p) => widget.onPlaceTap?.call(p),
       ),
     ));
@@ -122,11 +175,26 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
   }
 
+  void _openCityPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CityPickerSheet(
+        selectedCity: widget.selectedCity,
+        onSelected: (city) {
+          Navigator.of(context).pop();
+          if (city != widget.selectedCity) widget.onCityChanged?.call(city);
+        },
+      ),
+    );
+  }
+
   void _openCollection(CollectionData collection) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PlaceListScreen(
         title: collection.title,
-        fetcher: () async => collection.places,
+        fetcher: ({required offset, required limit}) async =>
+            collection.places.skip(offset).take(limit).toList(),
         onPlaceTap: (p) => widget.onPlaceTap?.call(p),
       ),
     ));
@@ -143,7 +211,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(s(context).loadErrorGeneric, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+              Text(s(context).loadErrorGeneric,
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
             ],
@@ -158,14 +228,16 @@ class _HomeScreenState extends State<HomeScreen> {
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(theme)),
           SliverToBoxAdapter(
-            child: _SectionTitle(title: s(context).trendingTitle, onSeeAll: _openAllTrending),
+            child: _SectionTitle(
+                title: s(context).trendingTitle, onSeeAll: _openAllTrending),
           ),
           SliverToBoxAdapter(child: _buildTrendingRow()),
           SliverToBoxAdapter(child: _buildCategoryFilterHeader(theme)),
           if (_selectedCategory != null) _buildFilterResultsSliver(theme),
           if (!_isLoading && _recentReviews.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionTitle(title: s(context).recentReviewsTitle, onSeeAll: () {}),
+              child: _SectionTitle(
+                  title: s(context).recentReviewsTitle, onSeeAll: () {}),
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -180,7 +252,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
           if (!_isLoading && _collections.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionTitle(title: s(context).collectionsTitle, onSeeAll: _openAllCollections),
+              child: _SectionTitle(
+                  title: s(context).collectionsTitle,
+                  onSeeAll: _openAllCollections),
             ),
             SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
           ],
@@ -196,38 +270,57 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: () {}, // TODO: выбор города, когда появится мультигород
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.location_on_rounded, size: 18, color: theme.colorScheme.primary),
-                const SizedBox(width: 4),
-                Text(s(context).cityName, style: theme.textTheme.titleMedium),
-                const SizedBox(width: 2),
-                Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: theme.textTheme.bodyMedium?.color),
-              ],
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: _openCityPicker,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.location_on_rounded,
+                        size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(s(context).cityLabel(widget.selectedCity),
+                        style: theme.textTheme.titleMedium),
+                    const SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_down_rounded,
+                        size: 18, color: theme.textTheme.bodyMedium?.color),
+                  ],
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
-          Container(
-            height: 50,
-            decoration: BoxDecoration(
-              color: theme.cardColor,
+          Material(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: widget.onOpenSearch,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 14),
-                Icon(Icons.search_rounded, color: theme.textTheme.bodyMedium?.color),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(s(context).searchHint, style: theme.textTheme.bodyMedium),
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.dividerColor),
                 ),
-                Icon(Icons.mic_none_rounded, color: theme.colorScheme.primary),
-                const SizedBox(width: 14),
-              ],
+                child: Row(
+                  children: [
+                    const SizedBox(width: 14),
+                    Icon(Icons.search_rounded,
+                        color: theme.textTheme.bodyMedium?.color),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(s(context).searchHint,
+                          style: theme.textTheme.bodyMedium),
+                    ),
+                    const SizedBox(width: 14),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -247,17 +340,31 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : _trending.isEmpty
               ? Center(
-                  child: Text(s(context).noPlacesYet, style: Theme.of(context).textTheme.bodyMedium),
+                  child: Text(s(context).noPlacesYet,
+                      style: Theme.of(context).textTheme.bodyMedium),
                 )
               : ListView.builder(
+                  controller: _trendingScrollController,
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: _trending.length,
+                  itemCount: _trending.length + (_hasMoreTrending ? 1 : 0),
                   itemBuilder: (context, i) {
+                    if (i >= _trending.length) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 14),
+                        child: SizedBox(
+                          width: 32,
+                          child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                        ),
+                      );
+                    }
                     final place = _trending[i];
                     return _StaggerIn(
                       index: i,
-                      child: PlaceCard(data: place, onTap: () => widget.onPlaceTap?.call(place)),
+                      child: PlaceCard(
+                          data: place,
+                          onTap: () => widget.onPlaceTap?.call(place)),
                     );
                   },
                 ),
@@ -270,10 +377,11 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          child: Text(s(context).categoriesTitle, style: theme.textTheme.headlineMedium),
+          child: Text(s(context).categoriesTitle,
+              style: theme.textTheme.headlineMedium),
         ),
         SizedBox(
-          height: 84,
+          height: 92,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -282,29 +390,46 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, i) {
               final c = _categories[i];
               final isActive = _selectedCategory == c.key;
-              return GestureDetector(
-                onTap: () => _onCategoryTap(c.key),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: isActive ? theme.colorScheme.primary.withValues(alpha: 0.15) : theme.cardColor,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: isActive ? theme.colorScheme.primary : theme.dividerColor, width: isActive ? 1.5 : 1),
-                      ),
-                      child: Icon(c.icon, color: theme.colorScheme.primary),
+              return Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  onTap: () => _onCategoryTap(c.key),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? theme.colorScheme.primary
+                                    .withValues(alpha: 0.15)
+                                : theme.cardColor,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                                color: isActive
+                                    ? theme.colorScheme.primary
+                                    : theme.dividerColor,
+                                width: isActive ? 1.5 : 1),
+                          ),
+                          child: Icon(c.icon, color: theme.colorScheme.primary),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          s(context).categoryPlural(c.key),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: isActive ? theme.colorScheme.primary : null,
+                            fontWeight: isActive ? FontWeight.w700 : null,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      s(context).categoryPlural(c.key),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: isActive ? theme.colorScheme.primary : null,
-                        fontWeight: isActive ? FontWeight.w700 : null,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -327,7 +452,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Center(child: Text(s(context).categoryEmpty, style: theme.textTheme.bodyMedium)),
+          child: Center(
+              child: Text(s(context).categoryEmpty,
+                  style: theme.textTheme.bodyMedium)),
         ),
       );
     }
@@ -337,7 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: _filteredPlaces.length,
         itemBuilder: (context, i) {
           final place = _filteredPlaces[i];
-          return PlaceListTile(data: place, onTap: () => widget.onPlaceTap?.call(place));
+          return PlaceListTile(
+              data: place, onTap: () => widget.onPlaceTap?.call(place));
         },
       ),
     );
@@ -353,19 +481,97 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final collection = _collections[i];
-          return GestureDetector(
-            onTap: () => _openCollection(collection),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
+          return Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: Ink(
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: AppColors.headerGradient(_categories[i % 4].key, isDark: theme.brightness == Brightness.dark)),
-                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                    colors: AppColors.headerGradient(_categories[i % 4].key,
+                        isDark: theme.brightness == Brightness.dark)),
               ),
-              child: Text(collection.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              child: InkWell(
+                onTap: () => _openCollection(collection),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  alignment: Alignment.center,
+                  child: Text(collection.title,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w600)),
+                ),
+              ),
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _CityPickerSheet extends StatelessWidget {
+  final String selectedCity;
+  final ValueChanged<String> onSelected;
+  const _CityPickerSheet(
+      {required this.selectedCity, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                  color: theme.dividerColor,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          Text(s(context).chooseCityTitle, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 14),
+          ...kCityKeys.map((key) {
+            final isActive = key == selectedCity;
+            return InkWell(
+              onTap: () => onSelected(key),
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      isActive
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_off_rounded,
+                      color: isActive
+                          ? theme.colorScheme.primary
+                          : theme.dividerColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      s(context).cityLabel(key),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: isActive ? theme.colorScheme.primary : null,
+                        fontWeight: isActive ? FontWeight.w700 : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -402,7 +608,8 @@ class _StaggerIn extends StatefulWidget {
   State<_StaggerIn> createState() => _StaggerInState();
 }
 
-class _StaggerInState extends State<_StaggerIn> with SingleTickerProviderStateMixin {
+class _StaggerInState extends State<_StaggerIn>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _c;
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
@@ -410,9 +617,11 @@ class _StaggerInState extends State<_StaggerIn> with SingleTickerProviderStateMi
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
     _fade = CurvedAnimation(parent: _c, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(_fade);
+    _slide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
+        .animate(_fade);
     Future.delayed(Duration(milliseconds: 60 * widget.index), () {
       if (mounted) _c.forward();
     });

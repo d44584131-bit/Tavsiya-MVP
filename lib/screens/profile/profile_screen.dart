@@ -60,8 +60,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 4, vsync: this);
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+      TabController(length: 4, vsync: this);
   late final StreamSubscription<AuthState> _authSub;
 
   bool _isLoading = true;
@@ -139,7 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Future<void> _openAuth() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const AuthScreen()));
   }
 
   Future<void> _signOut() async {
@@ -162,7 +165,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         },
         onFeedback: () {
           Navigator.of(context).pop();
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FeedbackScreen()));
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const FeedbackScreen()));
         },
       ),
     );
@@ -176,7 +180,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       appBar: AppBar(
         title: Text(s(context).profileTitle),
         actions: [
-          IconButton(icon: const Icon(Icons.settings_outlined), onPressed: _openSettings),
+          IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: _openSettings),
         ],
       ),
       body: _buildBody(theme),
@@ -189,7 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         icon: Icons.person_outline_rounded,
         title: s(context).signInPromptTitle,
         subtitle: s(context).signInPromptSubtitle,
-        action: ElevatedButton(onPressed: _openAuth, child: Text(s(context).signInButton)),
+        action: ElevatedButton(
+            onPressed: _openAuth, child: Text(s(context).signInButton)),
       );
     }
     if (_isLoading) {
@@ -202,7 +209,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(s(context).profileLoadError, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+              Text(s(context).profileLoadError,
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
             ],
@@ -221,34 +230,55 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               const SizedBox(height: 8),
               CircleAvatar(
                 radius: 40,
-                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: 0.15),
                 child: Text(
-                  profile.displayName.isNotEmpty ? profile.displayName[0].toUpperCase() : '?',
-                  style: theme.textTheme.headlineLarge?.copyWith(color: theme.colorScheme.primary),
+                  profile.displayName.isNotEmpty
+                      ? profile.displayName[0].toUpperCase()
+                      : '?',
+                  style: theme.textTheme.headlineLarge
+                      ?.copyWith(color: theme.colorScheme.primary),
                 ),
               ),
               const SizedBox(height: 12),
               Text(profile.displayName, style: theme.textTheme.headlineMedium),
               if (profile.bio != null) ...[
                 const SizedBox(height: 4),
-                Text(profile.bio!, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+                Text(profile.bio!,
+                    style: theme.textTheme.bodyMedium,
+                    textAlign: TextAlign.center),
               ],
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Expanded(child: _CounterItem(value: '${profile.reviewsCount}', label: s(context).statReviews)),
-                  Expanded(child: _CounterItem(value: '${profile.helpfulVotesCount}', label: s(context).usefulLabel)),
-                  Expanded(child: _CounterItem(value: '${profile.savedCount}', label: s(context).savedLabel)),
-                  Expanded(child: _CounterItem(value: '${profile.followersCount}', label: s(context).followersLabel)),
+                  Expanded(
+                      child: _CounterItem(
+                          value: '${profile.reviewsCount}',
+                          label: s(context).statReviews)),
+                  Expanded(
+                      child: _CounterItem(
+                          value: '${profile.helpfulVotesCount}',
+                          label: s(context).usefulLabel)),
+                  Expanded(
+                      child: _CounterItem(
+                          value: '${profile.savedCount}',
+                          label: s(context).savedLabel)),
+                  Expanded(
+                      child: _CounterItem(
+                          value: '${profile.followersCount}',
+                          label: s(context).followersLabel)),
                 ],
               ),
               if (profile.reviewsCount > 0) ...[
                 const SizedBox(height: 16),
                 StatusBadge(
-                  statusLabel: profile.reviewsCount >= 10 ? s(context).expertBadge : s(context).noviceBadge,
+                  statusLabel: profile.reviewsCount >= 10
+                      ? s(context).expertBadge
+                      : s(context).noviceBadge,
                   currentPoints: profile.reviewsCount,
                   nextLevelPoints: 50,
-                  nextLevelLabel: s(context).toGuruLevel((50 - profile.reviewsCount).clamp(0, 50)),
+                  nextLevelLabel: s(context)
+                      .toGuruLevel((50 - profile.reviewsCount).clamp(0, 50)),
                 ),
               ],
               const SizedBox(height: 8),
@@ -327,7 +357,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ],
           ),
         ),
-        Expanded(child: _savedSubTab == 0 ? _buildSavedPlacesList(theme) : _buildSavedReviewsEmpty()),
+        Expanded(
+            child: _savedSubTab == 0
+                ? _buildSavedPlacesList(theme)
+                : _buildSavedReviewsEmpty()),
       ],
     );
   }
@@ -347,7 +380,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         itemCount: _savedPlaces.length,
         itemBuilder: (context, i) {
           final p = _savedPlaces[i];
-          return PlaceListTile(data: p, onTap: () => widget.onPlaceTap?.call(p));
+          return PlaceListTile(
+              data: p, onTap: () => widget.onPlaceTap?.call(p));
         },
       ),
     );
@@ -393,7 +427,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
   }
 
-  Widget _buildEmptyTab({required IconData icon, required String title, required String subtitle}) {
+  Widget _buildEmptyTab(
+      {required IconData icon,
+      required String title,
+      required String subtitle}) {
     return EmptyState(icon: icon, title: title, subtitle: subtitle);
   }
 }
@@ -402,7 +439,8 @@ class _DraftTile extends StatelessWidget {
   final ReviewDraftData data;
   final VoidCallback onTap;
   final VoidCallback onDelete;
-  const _DraftTile({required this.data, required this.onTap, required this.onDelete});
+  const _DraftTile(
+      {required this.data, required this.onTap, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +462,8 @@ class _DraftTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(data.placeName ?? s(context).draftNoPlace, style: theme.textTheme.titleMedium),
+                  Text(data.placeName ?? s(context).draftNoPlace,
+                      style: theme.textTheme.titleMedium),
                   if (data.rating != null && data.rating! > 0) ...[
                     const SizedBox(height: 4),
                     Row(
@@ -433,19 +472,26 @@ class _DraftTile extends StatelessWidget {
                         (i) => Icon(
                           Icons.star_rounded,
                           size: 13,
-                          color: i < data.rating! ? AppColors.accentOrange : theme.dividerColor,
+                          color: i < data.rating!
+                              ? AppColors.accentOrange
+                              : theme.dividerColor,
                         ),
                       ),
                     ),
                   ],
                   if (data.text != null && data.text!.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(data.text!, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
+                    Text(data.text!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium),
                   ],
                 ],
               ),
             ),
-            IconButton(icon: const Icon(Icons.delete_outline_rounded), onPressed: onDelete),
+            IconButton(
+                icon: const Icon(Icons.delete_outline_rounded),
+                onPressed: onDelete),
           ],
         ),
       ),
@@ -508,10 +554,13 @@ class _SettingsSheet extends StatelessWidget {
               width: 36,
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                  color: theme.dividerColor,
+                  borderRadius: BorderRadius.circular(2)),
             ),
           ),
-          Text(s(context).languageSectionTitle, style: theme.textTheme.titleMedium),
+          Text(s(context).languageSectionTitle,
+              style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -533,7 +582,8 @@ class _SettingsSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          Text(s(context).themeSectionTitle, style: theme.textTheme.titleMedium),
+          Text(s(context).themeSectionTitle,
+              style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -599,37 +649,54 @@ class _SegmentButton extends StatelessWidget {
   final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
-  const _SegmentButton({required this.label, required this.selected, required this.onTap, this.icon});
+  const _SegmentButton(
+      {required this.label,
+      required this.selected,
+      required this.onTap,
+      this.icon});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? theme.colorScheme.primary : theme.cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? theme.colorScheme.primary : theme.dividerColor),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: selected ? Colors.white : theme.textTheme.bodyLarge?.color),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : theme.textTheme.bodyLarge?.color,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? theme.colorScheme.primary : theme.cardColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color:
+                    selected ? theme.colorScheme.primary : theme.dividerColor),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon,
+                    size: 16,
+                    color: selected
+                        ? Colors.white
+                        : theme.textTheme.bodyLarge?.color),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected
+                      ? Colors.white
+                      : theme.textTheme.bodyLarge?.color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -38,6 +38,14 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Системные диалоги разрешений: камера/галерея — фото к отзыву,
+	     геолокация — определение города, уведомления — статус модерации отзыва. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Камера нужна, чтобы сделать фото для отзыва</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Доступ к галерее нужен, чтобы выбрать фото для отзыва</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Геолокация помогает определить ваш город</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

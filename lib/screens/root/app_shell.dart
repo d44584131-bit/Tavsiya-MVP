@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/permission_service.dart';
 import '../../widgets/bottom_nav_bar.dart';
 import '../../widgets/place_card.dart';
 import '../home/home_screen.dart';
@@ -6,6 +8,8 @@ import '../search/search_screen.dart';
 import '../profile/profile_screen.dart';
 import '../place/place_detail_screen.dart';
 import '../review_form/review_form_screen.dart';
+
+const _prefsPermissionsRequestedKey = 'tavsiya.permissions_requested';
 
 /// Корневая оболочка приложения после онбординга: единая нижняя навигация
 /// (Главная, Поиск, Профиль + кнопка "Добавить отзыв" по центру), которая
@@ -15,15 +19,19 @@ import '../review_form/review_form_screen.dart';
 class AppShell extends StatefulWidget {
   final AppLanguage language;
   final AppThemeMode themeMode;
+  final String selectedCity;
   final ValueChanged<AppLanguage> onLanguageChanged;
   final ValueChanged<AppThemeMode> onThemeModeChanged;
+  final ValueChanged<String> onCityChanged;
 
   const AppShell({
     super.key,
     required this.language,
     required this.themeMode,
+    required this.selectedCity,
     required this.onLanguageChanged,
     required this.onThemeModeChanged,
+    required this.onCityChanged,
   });
 
   @override
@@ -33,6 +41,20 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   final _navigatorKey = GlobalKey<NavigatorState>();
   int _navIndex = 0;
+  bool _reviewFormActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeRequestPermissions();
+  }
+
+  Future<void> _maybeRequestPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_prefsPermissionsRequestedKey) ?? false) return;
+    await PermissionService.requestInitialPermissions();
+    await prefs.setBool(_prefsPermissionsRequestedKey, true);
+  }
 
   void _openPlace(PlaceCardData place) {
     _navigatorKey.currentState!.push(
@@ -54,18 +76,28 @@ class _AppShellState extends State<AppShell> {
     setState(() => _navIndex = index);
   }
 
-  Future<void> _openReviewForm({PlaceCardData? place, ReviewDraftData? draft}) {
-    return _navigatorKey.currentState!.push(
+  void _openSearch() => _onTabSelected(1);
+
+  Future<void> _openReviewForm({PlaceCardData? place, ReviewDraftData? draft}) async {
+    setState(() => _reviewFormActive = true);
+    await _navigatorKey.currentState!.push(
       MaterialPageRoute(
         builder: (_) => ReviewFormScreen(preselectedPlace: place, initialDraft: draft, language: widget.language),
       ),
     );
+    if (mounted) setState(() => _reviewFormActive = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final tabs = [
-      HomeScreen(language: widget.language, onPlaceTap: _openPlace),
+      HomeScreen(
+        language: widget.language,
+        onPlaceTap: _openPlace,
+        onOpenSearch: _openSearch,
+        selectedCity: widget.selectedCity,
+        onCityChanged: widget.onCityChanged,
+      ),
       SearchScreen(onPlaceTap: _openPlace),
       ProfileScreen(
         language: widget.language,
@@ -91,6 +123,7 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: _navIndex,
+        reviewActive: _reviewFormActive,
         onTabSelected: _onTabSelected,
         onAddReview: () => _openReviewForm(),
       ),

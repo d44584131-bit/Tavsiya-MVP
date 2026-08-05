@@ -1,14 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 
-/// Экран входа / регистрации. Показывается поверх текущего экрана (push),
-/// когда действие требует авторизации (сохранить место, оставить отзыв и т.п.).
-/// При успехе сама себя закрывает — вызывающий экран узнаёт об этом
-/// через `SupabaseService.authStateChanges` или проверяя `currentUser` после pop.
+/// Экран входа / регистрации. Обычно показывается поверх текущего экрана
+/// (push), когда действие требует авторизации (сохранить место, оставить
+/// отзыв и т.п.) — тогда после успеха сам себя закрывает (pop).
+/// При обязательной регистрации на первом запуске (см. main.dart) вместо
+/// pop вызывается [onAuthenticated], а [dismissible]=false прячет крестик —
+/// экран нельзя закрыть, не войдя в аккаунт.
+/// Закрытие отслеживается через authStateChanges, а не сразу после
+/// await signIn/signUp — это заодно ловит и вход через Google (OAuth
+/// возвращается в приложение через deep link, а не через этот await).
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  final bool dismissible;
+  final VoidCallback? onAuthenticated;
+  const AuthScreen({super.key, this.dismissible = true, this.onAuthenticated});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -18,14 +27,31 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _isSubmitting = false;
   bool _isGoogleSubmitting = false;
+  bool _handledAuth = false;
   String? _error;
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  late final StreamSubscription<AuthState> _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = SupabaseService.authStateChanges.listen((_) {
+      if (!mounted || _handledAuth || SupabaseService.currentUser == null) return;
+      _handledAuth = true;
+      if (widget.onAuthenticated != null) {
+        widget.onAuthenticated!();
+      } else {
+        Navigator.of(context).maybePop();
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSub.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
@@ -62,10 +88,10 @@ class _AuthScreenState extends State<AuthScreen> {
       }
       if (!mounted) return;
 
-      if (SupabaseService.currentUser != null) {
-        Navigator.of(context).pop();
-        return;
-      }
+      // Закрытие/переход при успехе — через authStateChanges (см. initState),
+      // единая точка и для входа по паролю, и для регистрации, и для Google.
+      if (SupabaseService.currentUser != null) return;
+
       // Регистрация прошла, но требуется подтверждение почты — сессии ещё нет.
       setState(() {
         _isSubmitting = false;
@@ -115,10 +141,13 @@ class _AuthScreenState extends State<AuthScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.maybePop(context),
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.dismissible
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.maybePop(context),
+              )
+            : null,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

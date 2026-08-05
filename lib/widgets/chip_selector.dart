@@ -27,22 +27,34 @@ class ChipSelector extends StatelessWidget {
           runSpacing: 8,
           children: options.map((o) {
             final isActive = o == selected;
-            return GestureDetector(
-              onTap: () => onSelected(o),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isActive ? theme.colorScheme.primary : theme.cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isActive ? theme.colorScheme.primary : theme.dividerColor),
-                ),
-                child: Text(
-                  o,
-                  style: TextStyle(
-                    color: isActive ? Colors.white : theme.textTheme.bodyLarge?.color,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
+            return Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () => onSelected(o),
+                borderRadius: BorderRadius.circular(20),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color:
+                        isActive ? theme.colorScheme.primary : theme.cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: isActive
+                            ? theme.colorScheme.primary
+                            : theme.dividerColor),
+                  ),
+                  child: Text(
+                    o,
+                    style: TextStyle(
+                      color: isActive
+                          ? Colors.white
+                          : theme.textTheme.bodyLarge?.color,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),

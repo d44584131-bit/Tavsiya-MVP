@@ -23,7 +23,8 @@ class OnboardingPageData {
 }
 
 class _CategoryChip {
-  final String categoryKey; // 'restaurant' | 'cafe' | 'park' | 'mall' — метка переводится на месте
+  final String
+      categoryKey; // 'restaurant' | 'cafe' | 'park' | 'mall' — метка переводится на месте
   final IconData icon;
   const _CategoryChip(this.categoryKey, this.icon);
 }
@@ -84,7 +85,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _openLogin() async {
     // "У меня уже есть аккаунт" — открываем настоящий экран входа, а не
     // просто пропускаем онбординг: до этого кнопка ничего не проверяла.
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const AuthScreen()));
     if (!mounted) return;
     widget.onFinish();
   }
@@ -93,7 +95,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_isLast) {
       widget.onFinish();
     } else {
-      _controller.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      _controller.nextPage(
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic);
     }
   }
 
@@ -110,12 +114,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Align(
                   alignment: Alignment.topRight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     child: TextButton(
                       onPressed: widget.onFinish,
                       child: Text(
                         s(context).skip,
-                        style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).textTheme.bodyMedium?.color),
                       ),
                     ),
                   ),
@@ -125,7 +132,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     controller: _controller,
                     itemCount: pages.length,
                     onPageChanged: (i) => setState(() => _index = i),
-                    itemBuilder: (context, i) => _OnboardingPage(data: pages[i], isDark: isDark),
+                    itemBuilder: (context, i) =>
+                        _OnboardingPage(data: pages[i], isDark: isDark),
                   ),
                 ),
                 Padding(
@@ -138,7 +146,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _next,
-                      child: Text(_isLast ? s(context).startButton : s(context).nextButton),
+                      child: Text(_isLast
+                          ? s(context).startButton
+                          : s(context).nextButton),
                     ),
                   ),
                 ),
@@ -175,13 +185,16 @@ class _OnboardingPage extends StatefulWidget {
   State<_OnboardingPage> createState() => _OnboardingPageState();
 }
 
-class _OnboardingPageState extends State<_OnboardingPage> with SingleTickerProviderStateMixin {
+class _OnboardingPageState extends State<_OnboardingPage>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
 
   @override
   void initState() {
     super.initState();
-    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..forward();
+    _anim = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700))
+      ..forward();
   }
 
   @override
@@ -194,7 +207,8 @@ class _OnboardingPageState extends State<_OnboardingPage> with SingleTickerProvi
   Widget _staggered(Widget child, {required double startAt}) {
     final curved = CurvedAnimation(
       parent: _anim,
-      curve: Interval(startAt, (startAt + 0.5).clamp(0.0, 1.0), curve: Curves.easeOutCubic),
+      curve: Interval(startAt, (startAt + 0.5).clamp(0.0, 1.0),
+          curve: Curves.easeOutCubic),
     );
     return AnimatedBuilder(
       animation: curved,
@@ -231,10 +245,12 @@ class _OnboardingPageState extends State<_OnboardingPage> with SingleTickerProvi
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: AppColors.headerGradient('cafe', isDark: widget.isDark),
+                  colors:
+                      AppColors.headerGradient('cafe', isDark: widget.isDark),
                 ),
               ),
-              child: Icon(d.illustrationIcon, size: 96, color: Colors.white.withValues(alpha: 0.95)),
+              child: Icon(d.illustrationIcon,
+                  size: 96, color: Colors.white.withValues(alpha: 0.95)),
             ),
             startAt: 0.0,
           ),
@@ -245,7 +261,8 @@ class _OnboardingPageState extends State<_OnboardingPage> with SingleTickerProvi
                 style: textTheme.headlineLarge,
                 children: [
                   TextSpan(text: d.titlePrefix),
-                  TextSpan(text: d.titleAccent, style: TextStyle(color: primary)),
+                  TextSpan(
+                      text: d.titleAccent, style: TextStyle(color: primary)),
                 ],
               ),
             ),
@@ -253,7 +270,8 @@ class _OnboardingPageState extends State<_OnboardingPage> with SingleTickerProvi
           ),
           const SizedBox(height: 12),
           _staggered(
-            Text(d.subtitle, textAlign: TextAlign.center, style: textTheme.bodyMedium),
+            Text(d.subtitle,
+                textAlign: TextAlign.center, style: textTheme.bodyMedium),
             startAt: 0.25,
           ),
           const SizedBox(height: 24),
@@ -265,16 +283,17 @@ class _OnboardingPageState extends State<_OnboardingPage> with SingleTickerProvi
                 physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                children: d.categories!
-                    .map((c) => _CategoryCell(chip: c))
-                    .toList(),
+                childAspectRatio: 0.75,
+                children:
+                    d.categories!.map((c) => _CategoryCell(chip: c)).toList(),
               ),
               startAt: 0.35,
             ),
           if (d.reviews != null)
             _staggered(
               Column(
-                children: d.reviews!.map((r) => _ReviewCard(review: r)).toList(),
+                children:
+                    d.reviews!.map((r) => _ReviewCard(review: r)).toList(),
               ),
               startAt: 0.35,
             ),
@@ -304,7 +323,8 @@ class _CategoryCell extends StatelessWidget {
           child: Icon(chip.icon, color: theme.colorScheme.primary),
         ),
         const SizedBox(height: 6),
-        Text(s(context).categoryPlural(chip.categoryKey), style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
+        Text(s(context).categoryPlural(chip.categoryKey),
+            style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
       ],
     );
   }
@@ -335,7 +355,9 @@ class _ReviewCard extends StatelessWidget {
               (i) => Icon(
                 Icons.star_rounded,
                 size: 16,
-                color: i < review.stars ? AppColors.accentOrange : theme.dividerColor,
+                color: i < review.stars
+                    ? AppColors.accentOrange
+                    : theme.dividerColor,
               ),
             ),
           ),

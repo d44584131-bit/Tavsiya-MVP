@@ -6,7 +6,7 @@ class PlaceReviewData {
   final String authorName;
   final int stars;
   final String text;
-  final int photosCount; // сколько фото приложено (заглушки-квадраты)
+  final List<String> photoUrls; // публичные URL фото, приложенных к отзыву
   final String? pros;
   final String? cons;
   final String? moderationStatus; // 'pending' | 'rejected' | null (= approved)
@@ -15,7 +15,7 @@ class PlaceReviewData {
     required this.authorName,
     required this.stars,
     required this.text,
-    this.photosCount = 0,
+    this.photoUrls = const [],
     this.pros,
     this.cons,
     this.moderationStatus,
@@ -96,21 +96,31 @@ class PlaceReviewCard extends StatelessWidget {
             if (data.pros != null) _ProsConsLine(icon: Icons.add_circle_outline, color: AppColors.positive, text: data.pros!),
             if (data.cons != null) _ProsConsLine(icon: Icons.remove_circle_outline, color: AppColors.negative, text: data.cons!),
           ],
-          if (data.photosCount > 0) ...[
+          if (data.photoUrls.isNotEmpty) ...[
             const SizedBox(height: 10),
             SizedBox(
               height: 64,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: data.photosCount,
+                itemCount: data.photoUrls.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => Container(
-                  width: 64,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(12),
+                itemBuilder: (context, i) => ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    data.photoUrls[i],
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) => progress == null
+                        ? child
+                        : Container(width: 64, height: 64, color: theme.dividerColor),
+                    errorBuilder: (context, error, stack) => Container(
+                      width: 64,
+                      height: 64,
+                      color: theme.dividerColor,
+                      child: Icon(Icons.broken_image_rounded, color: theme.textTheme.bodyMedium?.color, size: 20),
+                    ),
                   ),
-                  child: Icon(Icons.image_rounded, color: theme.textTheme.bodyMedium?.color, size: 22),
                 ),
               ),
             ),

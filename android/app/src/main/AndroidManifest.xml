@@ -45,6 +45,15 @@
          (добавляется автоматически для hot reload), но в release-сборке без этой
          строки в основном манифесте приложение не сможет обращаться к сети. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Камера и галерея — фото к отзыву (image_picker). -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Геолокация — определение города. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <!-- Уведомления о статусе модерации отзыва (Android 13+ требует разрешение в рантайме). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.

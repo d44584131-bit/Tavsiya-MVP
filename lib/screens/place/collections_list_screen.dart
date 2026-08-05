@@ -17,7 +17,7 @@ class CollectionsListScreen extends StatelessWidget {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PlaceListScreen(
         title: collection.title,
-        fetcher: () async => collection.places,
+        fetcher: ({required offset, required limit}) async => collection.places.skip(offset).take(limit).toList(),
         onPlaceTap: (p) => onPlaceTap?.call(p),
       ),
     ));

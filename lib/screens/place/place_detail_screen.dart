@@ -5,7 +5,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/stat_tile.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_review_card.dart';
-import '../auth/auth_screen.dart';
+import '../../widgets/auth_required_dialog.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
 
 class PlaceDetailData {
@@ -21,7 +21,6 @@ class PlaceDetailData {
   final bool isVerified;
   final double rating;
   final int reviewsCount;
-  final int photosCount;
 
   const PlaceDetailData({
     required this.id,
@@ -36,7 +35,6 @@ class PlaceDetailData {
     required this.isVerified,
     required this.rating,
     required this.reviewsCount,
-    required this.photosCount,
   });
 
   static const _priceLevelLabels = {
@@ -53,14 +51,22 @@ class PlaceDetailScreen extends StatefulWidget {
   final String placeId;
   final AppLanguage language;
   final Future<void> Function(PlaceCardData place) onLeaveReview;
-  const PlaceDetailScreen({super.key, required this.placeId, required this.language, required this.onLeaveReview});
+  const PlaceDetailScreen(
+      {super.key,
+      required this.placeId,
+      required this.language,
+      required this.onLeaveReview});
 
   @override
   State<PlaceDetailScreen> createState() => _PlaceDetailScreenState();
 }
 
-class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 4, vsync: this);
+class _PlaceDetailScreenState extends State<PlaceDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+      TabController(length: 4, vsync: this);
+  final _photoPageController = PageController();
+  int _photoPageIndex = 0;
   bool _aboutExpanded = false;
 
   bool _isLoading = true;
@@ -70,10 +76,21 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   bool _isSaved = false;
   bool _isTogglingSave = false;
 
+  /// Фото места собираются из тех, что посетители прикрепили к своим отзывам
+  /// (своей отдельной загрузки фото места пока нет) — используются и в
+  /// карусели шапки, и во вкладке "Фото".
+  List<String> get _allPhotos => _reviews.expand((r) => r.photoUrls).toList();
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _photoPageController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -84,7 +101,8 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
     try {
       final results = await Future.wait([
         SupabaseService.fetchPlaceById(widget.placeId),
-        SupabaseService.fetchApprovedReviews(widget.placeId, language: widget.language),
+        SupabaseService.fetchApprovedReviews(widget.placeId,
+            language: widget.language),
         SupabaseService.isPlaceSaved(widget.placeId),
       ]);
       if (!mounted) return;
@@ -104,10 +122,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   }
 
   Future<void> _toggleSaved() async {
-    if (SupabaseService.currentUser == null) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
+    if (!await ensureAuthenticated(
+        context, s(context).authRequiredActionSave)) {
       return;
     }
+    if (!mounted) return;
     final next = !_isSaved;
     setState(() {
       _isSaved = next;
@@ -133,14 +152,16 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
     }
     if (_error != null || _place == null) {
       return Scaffold(
-        appBar: AppBar(leading: BackButton(onPressed: () => Navigator.maybePop(context))),
+        appBar: AppBar(
+            leading: BackButton(onPressed: () => Navigator.maybePop(context))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_error ?? s(context).placeNotFound, textAlign: TextAlign.center),
+                Text(_error ?? s(context).placeNotFound,
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 ElevatedButton(onPressed: _load, child: Text(s(context).retry)),
               ],
@@ -171,20 +192,51 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
             expandedHeight: 260,
             pinned: true,
             backgroundColor: theme.scaffoldBackgroundColor,
-            leading: _CircleIconButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.maybePop(context)),
+            leading: _CircleIconButton(
+                icon: Icons.arrow_back_rounded,
+                onTap: () => Navigator.maybePop(context)),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: AppColors.headerGradient(place.category, isDark: isDark),
+                  if (_allPhotos.isEmpty)
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: AppColors.headerGradient(place.category,
+                              isDark: isDark),
+                        ),
+                      ),
+                    )
+                  else
+                    PageView.builder(
+                      controller: _photoPageController,
+                      onPageChanged: (i) => setState(() => _photoPageIndex = i),
+                      itemCount: _allPhotos.length,
+                      itemBuilder: (context, i) => Image.network(
+                        _allPhotos[i],
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                                ? child
+                                : Container(
+                                    color: theme.cardColor,
+                                    child: const Center(
+                                        child: CircularProgressIndicator())),
+                        errorBuilder: (context, error, stack) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: AppColors.headerGradient(place.category,
+                                  isDark: isDark),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
                   // затемнение снизу, чтобы бейдж/иконки были читаемы на любом фото
                   Positioned.fill(
                     child: DecoratedBox(
@@ -192,17 +244,44 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.35)],
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.35)
+                          ],
                         ),
                       ),
                     ),
                   ),
+                  if (_allPhotos.length > 1)
+                    Positioned(
+                      bottom: 12,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          _allPhotos.length,
+                          (i) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: i == _photoPageIndex ? 16 : 6,
+                            height: 6,
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(
+                                  alpha: i == _photoPageIndex ? 0.95 : 0.5),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   if (place.isVerified)
                     Positioned(
                       top: 60,
                       right: 16,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(12),
@@ -210,9 +289,14 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.verified_rounded, size: 14, color: Colors.white),
+                            const Icon(Icons.verified_rounded,
+                                size: 14, color: Colors.white),
                             const SizedBox(width: 4),
-                            Text(s(context).verifiedBadge, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                            Text(s(context).verifiedBadge,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -231,11 +315,15 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded, size: 16, color: AppColors.accentOrange),
+                      const Icon(Icons.star_rounded,
+                          size: 16, color: AppColors.accentOrange),
                       const SizedBox(width: 4),
-                      Text(place.rating.toStringAsFixed(1), style: theme.textTheme.titleMedium),
+                      Text(place.rating.toStringAsFixed(1),
+                          style: theme.textTheme.titleMedium),
                       const SizedBox(width: 4),
-                      Text('(${s(context).reviewsCount(place.reviewsCount)}) · ${place.district}', style: theme.textTheme.labelSmall),
+                      Text(
+                          '(${s(context).reviewsCount(place.reviewsCount)}) · ${place.district}',
+                          style: theme.textTheme.labelSmall),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -285,11 +373,21 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   Widget _buildQuickActions(ThemeData theme, PlaceDetailData place) {
     return Row(
       children: [
-        _QuickAction(icon: Icons.call_rounded, label: s(context).callAction, onTap: () {}),
-        _QuickAction(icon: Icons.directions_rounded, label: s(context).routeAction, onTap: () {}),
-        _QuickAction(icon: Icons.language_rounded, label: s(context).websiteAction, onTap: () {}),
         _QuickAction(
-          icon: _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            icon: Icons.call_rounded,
+            label: s(context).callAction,
+            onTap: () {}),
+        _QuickAction(
+            icon: Icons.directions_rounded,
+            label: s(context).routeAction,
+            onTap: () {}),
+        _QuickAction(
+            icon: Icons.language_rounded,
+            label: s(context).websiteAction,
+            onTap: () {}),
+        _QuickAction(
+          icon:
+              _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
           label: s(context).saveAction,
           active: _isSaved,
           onTap: _isTogglingSave ? null : _toggleSaved,
@@ -301,13 +399,29 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   Widget _buildStatsRow(PlaceDetailData place) {
     return Row(
       children: [
-        Expanded(child: StatTile(icon: Icons.star_rounded, value: place.rating.toStringAsFixed(1), label: s(context).statRating)),
+        Expanded(
+            child: StatTile(
+                icon: Icons.star_rounded,
+                value: place.rating.toStringAsFixed(1),
+                label: s(context).statRating)),
         const SizedBox(width: 10),
-        Expanded(child: StatTile(icon: Icons.forum_rounded, value: '${place.reviewsCount}', label: s(context).statReviews)),
+        Expanded(
+            child: StatTile(
+                icon: Icons.forum_rounded,
+                value: '${place.reviewsCount}',
+                label: s(context).statReviews)),
         const SizedBox(width: 10),
-        Expanded(child: StatTile(icon: Icons.photo_camera_rounded, value: '${place.photosCount}', label: s(context).statPhotos)),
+        Expanded(
+            child: StatTile(
+                icon: Icons.photo_camera_rounded,
+                value: '${_allPhotos.length}',
+                label: s(context).statPhotos)),
         const SizedBox(width: 10),
-        Expanded(child: StatTile(icon: Icons.payments_rounded, value: place.priceLevelLabel, label: s(context).statPrice)),
+        Expanded(
+            child: StatTile(
+                icon: Icons.payments_rounded,
+                value: place.priceLevelLabel,
+                label: s(context).statPrice)),
       ],
     );
   }
@@ -327,7 +441,8 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
             child: Text(
               about,
               maxLines: _aboutExpanded ? null : 3,
-              overflow: _aboutExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              overflow:
+                  _aboutExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium,
             ),
           ),
@@ -338,7 +453,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   _aboutExpanded ? s(context).collapse : s(context).readMore,
-                  style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -346,7 +463,8 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(s(context).recentReviewsShort, style: theme.textTheme.titleMedium),
+              Text(s(context).recentReviewsShort,
+                  style: theme.textTheme.titleMedium),
               TextButton(
                 onPressed: () => _tabController.animateTo(1),
                 child: Text(s(context).seeAll),
@@ -377,7 +495,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
   }
 
   Widget _buildPhotosTab(ThemeData theme, PlaceDetailData place) {
-    if (place.photosCount == 0) {
+    if (_allPhotos.isEmpty) {
       return Center(
         child: Text(s(context).noPhotosYet, style: theme.textTheme.bodyMedium),
       );
@@ -389,28 +507,60 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> with SingleTicker
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: place.photosCount,
-      itemBuilder: (context, i) => Container(
-        decoration: BoxDecoration(
-          color: theme.dividerColor,
+      itemCount: _allPhotos.length,
+      itemBuilder: (context, i) => InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _openPhotoViewer(i),
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            _allPhotos[i],
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) =>
+                progress == null ? child : Container(color: theme.dividerColor),
+            errorBuilder: (context, error, stack) => Container(
+              color: theme.dividerColor,
+              child: Icon(Icons.broken_image_rounded,
+                  color: theme.textTheme.bodyMedium?.color),
+            ),
+          ),
         ),
-        child: Icon(Icons.image_rounded, color: theme.textTheme.bodyMedium?.color),
       ),
     );
   }
 
+  void _openPhotoViewer(int index) {
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) =>
+          _PhotoViewerScreen(photos: _allPhotos, initialIndex: index),
+    ));
+  }
+
   Widget _buildInfoTab(ThemeData theme, PlaceDetailData place) {
     final rows = [
-      (Icons.place_rounded, s(context).infoAddress, place.address ?? s(context).notSpecified),
-      (Icons.phone_rounded, s(context).infoPhone, place.phone ?? s(context).notSpecified),
-      (Icons.language_rounded, s(context).infoWebsite, place.website ?? s(context).notSpecified),
+      (
+        Icons.place_rounded,
+        s(context).infoAddress,
+        place.address ?? s(context).notSpecified
+      ),
+      (
+        Icons.phone_rounded,
+        s(context).infoPhone,
+        place.phone ?? s(context).notSpecified
+      ),
+      (
+        Icons.language_rounded,
+        s(context).infoWebsite,
+        place.website ?? s(context).notSpecified
+      ),
       (Icons.payments_rounded, s(context).infoAvgCheck, place.priceLevelLabel),
     ];
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       itemCount: rows.length,
-      separatorBuilder: (_, __) => Divider(height: 24, color: theme.dividerColor),
+      separatorBuilder: (_, __) =>
+          Divider(height: 24, color: theme.dividerColor),
       itemBuilder: (context, i) {
         final (icon, label, value) = rows[i];
         return Row(
@@ -438,12 +588,17 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback? onTap;
-  const _QuickAction({required this.icon, required this.label, required this.onTap, this.active = false});
+  const _QuickAction(
+      {required this.icon,
+      required this.label,
+      required this.onTap,
+      this.active = false});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = active ? theme.colorScheme.primary : theme.textTheme.bodyLarge?.color;
+    final color =
+        active ? theme.colorScheme.primary : theme.textTheme.bodyLarge?.color;
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -456,7 +611,9 @@ class _QuickAction extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: active ? theme.colorScheme.primary.withValues(alpha: 0.12) : theme.cardColor,
+                  color: active
+                      ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                      : theme.cardColor,
                   shape: BoxShape.circle,
                   border: Border.all(color: theme.dividerColor),
                 ),
@@ -487,9 +644,78 @@ class _CircleIconButton extends StatelessWidget {
         child: Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.35),
+              shape: BoxShape.circle),
           child: Icon(icon, color: Colors.white, size: 18),
         ),
+      ),
+    );
+  }
+}
+
+/// Полноэкранный просмотр фото места (открывается из вкладки "Фото") —
+/// свайп между фото + пинч-зум на каждом.
+class _PhotoViewerScreen extends StatefulWidget {
+  final List<String> photos;
+  final int initialIndex;
+  const _PhotoViewerScreen({required this.photos, required this.initialIndex});
+
+  @override
+  State<_PhotoViewerScreen> createState() => _PhotoViewerScreenState();
+}
+
+class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
+  late final _controller = PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemCount: widget.photos.length,
+            itemBuilder: (context, i) => InteractiveViewer(
+              child: Center(
+                  child: Image.network(widget.photos[i], fit: BoxFit.contain)),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: SafeArea(
+              child: IconButton(
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+          ),
+          if (widget.photos.length > 1)
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Center(
+                  child: Text(
+                    '${_index + 1} / ${widget.photos.length}',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -502,7 +728,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   _TabBarDelegate(this.controller, this.tabs);
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     final theme = Theme.of(context);
     return Container(
       color: theme.scaffoldBackgroundColor,

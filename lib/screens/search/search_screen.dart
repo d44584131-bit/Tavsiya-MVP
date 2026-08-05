@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../widgets/place_card.dart';
+import '../../widgets/place_list_tile.dart';
 import '../../widgets/empty_state.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -15,11 +16,16 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  static const _pageSize = 10;
+
   final _controller = TextEditingController();
+  final _scrollController = ScrollController();
   String? _categoryFilter; // null = все категории
 
   Timer? _debounce;
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   bool _hasError = false;
   List<PlaceCardData> _results = const [];
 
@@ -28,6 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _search();
   }
 
@@ -35,6 +42,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -42,6 +50,14 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), _search);
     setState(() {}); // обновить очищаемую иконку и т.п. без ожидания дебаунса
+  }
+
+  void _onScroll() {
+    if (!_hasMore || _isLoadingMore || _isLoading) return;
+    if (_scrollController.position.pixels >
+        _scrollController.position.maxScrollExtent - 300) {
+      _loadMore();
+    }
   }
 
   Future<void> _search() async {
@@ -53,10 +69,12 @@ class _SearchScreenState extends State<SearchScreen> {
       final results = await SupabaseService.searchPlaces(
         query: _controller.text,
         category: _categoryFilter,
+        limit: _pageSize,
       );
       if (!mounted) return;
       setState(() {
         _results = results;
+        _hasMore = results.length == _pageSize;
         _isLoading = false;
       });
     } catch (_) {
@@ -65,6 +83,27 @@ class _SearchScreenState extends State<SearchScreen> {
         _hasError = true;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    setState(() => _isLoadingMore = true);
+    try {
+      final more = await SupabaseService.searchPlaces(
+        query: _controller.text,
+        category: _categoryFilter,
+        limit: _pageSize,
+        offset: _results.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        _results = [..._results, ...more];
+        _hasMore = more.length == _pageSize;
+        _isLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingMore = false);
     }
   }
 
@@ -106,28 +145,42 @@ class _SearchScreenState extends State<SearchScreen> {
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, i) {
                 final key = _categoryKeys[i];
-                final label = key == null ? s(context).allCategories : s(context).categoryPlural(key);
+                final label = key == null
+                    ? s(context).allCategories
+                    : s(context).categoryPlural(key);
                 final isActive = _categoryFilter == key;
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    _categoryFilter = key;
-                    _search();
-                  }),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isActive ? theme.colorScheme.primary : theme.cardColor,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: isActive ? theme.colorScheme.primary : theme.dividerColor),
-                    ),
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: isActive ? Colors.white : theme.textTheme.bodyLarge?.color,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
+                return Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  child: InkWell(
+                    onTap: () => setState(() {
+                      _categoryFilter = key;
+                      _search();
+                    }),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? theme.colorScheme.primary
+                            : theme.cardColor,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: isActive
+                                ? theme.colorScheme.primary
+                                : theme.dividerColor),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: isActive
+                              ? Colors.white
+                              : theme.textTheme.bodyLarge?.color,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ),
@@ -153,7 +206,9 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(s(context).searchLoadError, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+              Text(s(context).searchLoadError,
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _search, child: Text(s(context).retry)),
             ],
@@ -169,64 +224,19 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      itemCount: _results.length,
+      itemCount: _results.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, i) {
+        if (i >= _results.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
         final p = _results[i];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _SearchResultTile(data: p, onTap: () => widget.onPlaceTap?.call(p)),
-        );
+        return PlaceListTile(data: p, onTap: () => widget.onPlaceTap?.call(p));
       },
-    );
-  }
-}
-
-class _SearchResultTile extends StatelessWidget {
-  final PlaceCardData data;
-  final VoidCallback onTap;
-  const _SearchResultTile({required this.data, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.dividerColor),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
-              child: Icon(Icons.place_rounded, color: theme.colorScheme.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(data.name, style: theme.textTheme.titleMedium),
-                  Text('${s(context).categoryLabel(data.category)} · ${data.district}', style: theme.textTheme.labelSmall),
-                ],
-              ),
-            ),
-            Row(
-              children: [
-                const Icon(Icons.star_rounded, size: 14, color: Colors.orange),
-                Text(data.rating.toStringAsFixed(1), style: theme.textTheme.labelSmall),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

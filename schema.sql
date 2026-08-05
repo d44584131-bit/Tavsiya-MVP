@@ -2,7 +2,23 @@
 -- Tavsiya — схема базы данных (Supabase / Postgres)
 -- =========================================================
 -- Порядок применения: этот файл целиком через Supabase SQL Editor
--- или как одну миграцию (supabase db push / migration new).
+-- или как одну миграцию (supabase db push / migration new) — на ПУСТОЙ базе,
+-- с нуля. Секции ниже с пометкой "МИГРАЦИЯ" применялись позже, отдельными
+-- запросами, поверх уже существующей базы — они собраны здесь как архив
+-- всех SQL-команд, которые реально выполнялись в Supabase SQL Editor.
+--
+-- Это структурный бэкап (DDL: таблицы/колонки/политики/функции), не бэкап
+-- данных. Ведётся вручную: после каждого изменения в базе, сделанного через
+-- SQL Editor, соответствующий запрос дописывается сюда отдельной секцией
+-- "МИГРАЦИЯ" — файл не подключён напрямую к живой базе и не синхронизируется
+-- с ней автоматически, поэтому он настолько актуален, насколько аккуратно
+-- сюда дописывается каждое изменение.
+--
+-- Для гарантированного снимка реальной текущей структуры (на случай если
+-- что-то было выполнено в SQL Editor и не попало сюда) — Supabase Dashboard
+-- → Database → Backups, либо через CLI: `supabase db dump --schema public
+-- -f structure_backup.sql` (нужен установленный Supabase CLI и `supabase
+-- link` к проекту).
 -- =========================================================
 
 create extension if not exists "pgcrypto";   -- gen_random_uuid()
@@ -423,8 +439,28 @@ create policy "collections_select_all" on public.collections for select using (t
 create policy "collection_places_select_all" on public.collection_places for select using (true);
 
 -- =========================================================
--- STORAGE BUCKETS (создать через Dashboard или отдельным скриптом)
+-- МИГРАЦИЯ: storage bucket для фото отзывов (выполнено в SQL Editor)
 -- =========================================================
--- avatars        — публичный, 1 файл на пользователя (path: {user_id}/avatar.jpg)
--- place-photos   — публичный на чтение, запись — authenticated
--- review-photos  — публичный на чтение, запись — authenticated, привязка к своему отзыву
+-- avatars        — публичный, 1 файл на пользователя (path: {user_id}/avatar.jpg) — пока не используется
+-- place-photos   — публичный на чтение, запись — authenticated — пока не используется
+-- review-photos  — публичный на чтение, запись — authenticated, привязка к своему отзыву — создаётся ниже
+
+insert into storage.buckets (id, name, public)
+values ('review-photos', 'review-photos', true)
+on conflict (id) do nothing;
+
+create policy "review_photos_storage_select" on storage.objects
+  for select using (bucket_id = 'review-photos');
+create policy "review_photos_storage_insert" on storage.objects
+  for insert with check (bucket_id = 'review-photos' and auth.uid() is not null);
+
+-- =========================================================
+-- МИГРАЦИЯ: город места (выбор региона на главном экране и в онбординге)
+-- =========================================================
+-- Пока реальные данные есть только для Ташкента — places.city проставляется
+-- 'tashkent' у всех существующих строк через default при добавлении колонки.
+-- NB: как и с политиками — если этот блок уже применялся, alter table ...
+-- add column выдаст ошибку "column already exists", это нормально, пропустите.
+
+alter table public.places add column city text not null default 'tashkent';
+create index places_city_idx on public.places (city);

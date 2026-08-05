@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:typed_data' show Uint8List;
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/star_rating_input.dart';
+import '../../widgets/auth_required_dialog.dart';
 import '../../widgets/chip_selector.dart';
-import '../auth/auth_screen.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
 
 /// Черновик отзыва (таблица review_drafts) — сохраняется при выходе из формы
@@ -39,10 +42,16 @@ class ReviewDraftData {
 }
 
 class ReviewFormScreen extends StatefulWidget {
-  final PlaceCardData? preselectedPlace; // если пришли с карточки места — шаг 1 пропускается
-  final ReviewDraftData? initialDraft; // если продолжаем черновик — тоже пропускается
+  final PlaceCardData?
+      preselectedPlace; // если пришли с карточки места — шаг 1 пропускается
+  final ReviewDraftData?
+      initialDraft; // если продолжаем черновик — тоже пропускается
   final AppLanguage language;
-  const ReviewFormScreen({super.key, this.preselectedPlace, this.initialDraft, required this.language});
+  const ReviewFormScreen(
+      {super.key,
+      this.preselectedPlace,
+      this.initialDraft,
+      required this.language});
 
   @override
   State<ReviewFormScreen> createState() => _ReviewFormScreenState();
@@ -50,8 +59,10 @@ class ReviewFormScreen extends StatefulWidget {
 
 class _ReviewFormScreenState extends State<ReviewFormScreen> {
   static const _maxChars = 500;
-  bool get _hasPreselection => widget.preselectedPlace != null || widget.initialDraft != null;
-  late final _controller = PageController(initialPage: _hasPreselection ? 1 : 0);
+  bool get _hasPreselection =>
+      widget.preselectedPlace != null || widget.initialDraft != null;
+  late final _controller =
+      PageController(initialPage: _hasPreselection ? 1 : 0);
   final _textController = TextEditingController();
   final _searchController = TextEditingController();
 
@@ -60,14 +71,16 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   String? _newPlaceName;
   String? _newPlaceCategory;
   int _rating = 0;
-  int _photosCount = 0;
+  final _picker = ImagePicker();
+  final List<Uint8List> _photoBytes = [];
   final _prosController = TextEditingController();
   final _consController = TextEditingController();
   String? _priceChip;
   String? _withWhomChip;
   bool _isSubmitting = false;
   String? _submitError;
-  String? _draftId; // если продолжаем черновик — обновляем его вместо создания нового
+  String?
+      _draftId; // если продолжаем черновик — обновляем его вместо создания нового
 
   Timer? _searchDebounce;
   bool _isSearchingPlaces = false;
@@ -134,7 +147,9 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       _consController.text.trim().isNotEmpty;
 
   Future<void> _maybeSaveDraft() async {
-    if (_step == 3) return; // отзыв уже опубликован, черновик уже удалён в _submit()
+    if (_step == 3) {
+      return; // отзыв уже опубликован, черновик уже удалён в _submit()
+    }
     if (!_hasDraftableContent) {
       if (_draftId != null) {
         try {
@@ -145,16 +160,24 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       }
       return;
     }
-    if (SupabaseService.currentUser == null) return; // без входа черновики не сохраняем
+    if (SupabaseService.currentUser == null) {
+      return; // без входа черновики не сохраняем
+    }
     try {
       _draftId = await SupabaseService.saveDraft(
         draftId: _draftId,
         placeId: _selectedExistingPlace?.id,
         placeNameDraft: _selectedExistingPlace == null ? _newPlaceName : null,
         rating: _rating,
-        text: _textController.text.trim().isEmpty ? null : _textController.text.trim(),
-        pros: _prosController.text.trim().isEmpty ? null : _prosController.text.trim(),
-        cons: _consController.text.trim().isEmpty ? null : _consController.text.trim(),
+        text: _textController.text.trim().isEmpty
+            ? null
+            : _textController.text.trim(),
+        pros: _prosController.text.trim().isEmpty
+            ? null
+            : _prosController.text.trim(),
+        cons: _consController.text.trim().isEmpty
+            ? null
+            : _consController.text.trim(),
         priceLevel: _priceChip,
         withWhom: _withWhomChip,
       );
@@ -176,7 +199,9 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
 
   void _goTo(int step) {
     setState(() => _step = step);
-    _controller.animateToPage(step, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+    _controller.animateToPage(step,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic);
   }
 
   void _onSearchChanged() {
@@ -188,7 +213,8 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   Future<void> _searchPlaces() async {
     setState(() => _isSearchingPlaces = true);
     try {
-      final results = await SupabaseService.searchPlaces(query: _searchController.text);
+      final results =
+          await SupabaseService.searchPlaces(query: _searchController.text);
       if (!mounted) return;
       setState(() {
         _placeResults = results;
@@ -201,14 +227,49 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   }
 
   bool get _canProceedFromStep1 =>
-      _selectedExistingPlace != null || (_newPlaceName != null && _newPlaceCategory != null);
-  bool get _canProceedFromStep2 => _rating > 0 && _textController.text.trim().length >= 10;
+      _selectedExistingPlace != null ||
+      (_newPlaceName != null && _newPlaceCategory != null);
+  bool get _canProceedFromStep2 =>
+      _rating > 0 && _textController.text.trim().length >= 10;
+
+  Future<void> _addPhoto() async {
+    if (_photoBytes.length >= 6) return;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(s(context).choosePhotoGallery),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: Text(s(context).choosePhotoCamera),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final file = await _picker.pickImage(
+        source: source, maxWidth: 1600, imageQuality: 85);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    setState(() => _photoBytes.add(bytes));
+  }
+
+  void _removePhoto(int index) => setState(() => _photoBytes.removeAt(index));
 
   Future<void> _submit() async {
-    if (SupabaseService.currentUser == null) {
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
-      if (!mounted || SupabaseService.currentUser == null) return;
+    if (!await ensureAuthenticated(
+        context, s(context).authRequiredActionReview)) {
+      return;
     }
+    if (!mounted) return;
 
     setState(() {
       _isSubmitting = true;
@@ -217,17 +278,24 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
     try {
       final placeId = _selectedExistingPlace != null
           ? _selectedExistingPlace!.id
-          : (await SupabaseService.createPlace(name: _newPlaceName!, category: _newPlaceCategory!)).id;
+          : (await SupabaseService.createPlace(
+                  name: _newPlaceName!, category: _newPlaceCategory!))
+              .id;
 
       await SupabaseService.submitReview(
         placeId: placeId,
         rating: _rating,
         text: _textController.text.trim(),
-        pros: _prosController.text.trim().isEmpty ? null : _prosController.text.trim(),
-        cons: _consController.text.trim().isEmpty ? null : _consController.text.trim(),
+        pros: _prosController.text.trim().isEmpty
+            ? null
+            : _prosController.text.trim(),
+        cons: _consController.text.trim().isEmpty
+            ? null
+            : _consController.text.trim(),
         priceLevel: _priceChip,
         withWhom: _withWhomChip,
         language: widget.language == AppLanguage.uz ? 'uz' : 'ru',
+        photos: _photoBytes,
       );
       if (_draftId != null) {
         try {
@@ -239,11 +307,16 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       _goTo(3);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // unique(place_id, user_id) — второй отзыв на то же место от того же
+      // пользователя запрещён в БД; показываем понятную причину вместо общей ошибки.
+      final isDuplicate = e is PostgrestException && e.code == '23505';
       setState(() {
         _isSubmitting = false;
-        _submitError = s(context).reviewSubmitError;
+        _submitError = isDuplicate
+            ? s(context).reviewDuplicateError
+            : s(context).reviewSubmitError;
       });
     }
   }
@@ -301,7 +374,8 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
               height: 4,
               margin: EdgeInsets.only(right: i == _stepCount - 1 ? 0 : 6),
               decoration: BoxDecoration(
-                color: isActive ? theme.colorScheme.primary : theme.dividerColor,
+                color:
+                    isActive ? theme.colorScheme.primary : theme.dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -319,7 +393,8 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(s(context).placeStepTitle, style: theme.textTheme.headlineMedium),
+          Text(s(context).placeStepTitle,
+              style: theme.textTheme.headlineMedium),
           const SizedBox(height: 16),
           Container(
             height: 50,
@@ -372,10 +447,15 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                     const SizedBox(height: 12),
                     ChipSelector(
                       label: s(context).placeCategoryLabel,
-                      options: _newPlaceCategoryKeys.map((k) => s(context).categoryLabel(k)).toList(),
-                      selected: _newPlaceCategory == null ? null : s(context).categoryLabel(_newPlaceCategory!),
+                      options: _newPlaceCategoryKeys
+                          .map((k) => s(context).categoryLabel(k))
+                          .toList(),
+                      selected: _newPlaceCategory == null
+                          ? null
+                          : s(context).categoryLabel(_newPlaceCategory!),
                       onSelected: (label) => setState(() {
-                        _newPlaceCategory = _newPlaceCategoryKeys.firstWhere((k) => s(context).categoryLabel(k) == label);
+                        _newPlaceCategory = _newPlaceCategoryKeys.firstWhere(
+                            (k) => s(context).categoryLabel(k) == label);
                       }),
                     ),
                   ],
@@ -402,9 +482,12 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
           Center(
             child: Column(
               children: [
-                Text(s(context).rateQuestion, style: theme.textTheme.bodyMedium),
+                Text(s(context).rateQuestion,
+                    style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 12),
-                StarRatingInput(value: _rating, onChanged: (v) => setState(() => _rating = v)),
+                StarRatingInput(
+                    value: _rating,
+                    onChanged: (v) => setState(() => _rating = v)),
               ],
             ),
           ),
@@ -420,13 +503,18 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
               hintText: s(context).reviewHint,
               filled: true,
               fillColor: theme.cardColor,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.dividerColor)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: theme.colorScheme.primary)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: theme.dividerColor)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: theme.colorScheme.primary)),
               counterText: '${_textController.text.length}/$_maxChars',
             ),
           ),
           const SizedBox(height: 16),
-          Text(s(context).photosOptionalLabel, style: theme.textTheme.titleMedium),
+          Text(s(context).photosOptionalLabel,
+              style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           SizedBox(
             height: 72,
@@ -434,32 +522,65 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
               scrollDirection: Axis.horizontal,
               children: [
                 ...List.generate(
-                  _photosCount,
-                  (i) => Container(
-                    width: 72,
-                    margin: const EdgeInsets.only(right: 10),
-                    decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(14)),
-                    child: Icon(Icons.image_rounded, color: theme.textTheme.bodyMedium?.color),
+                  _photoBytes.length,
+                  (i) => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          image: DecorationImage(
+                              image: MemoryImage(_photoBytes[i]),
+                              fit: BoxFit.cover),
+                        ),
+                      ),
+                      Positioned(
+                        top: -4,
+                        right: 6,
+                        child: GestureDetector(
+                          onTap: () => _removePhoto(i),
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: const BoxDecoration(
+                                color: Colors.black54, shape: BoxShape.circle),
+                            child: const Icon(Icons.close_rounded,
+                                color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                GestureDetector(
-                  onTap: () => setState(() => _photosCount = (_photosCount + 1).clamp(0, 6)),
-                  child: Container(
-                    width: 72,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: theme.dividerColor, width: 1.5),
+                if (_photoBytes.length < 6)
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      onTap: _addPhoto,
                       borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        width: 72,
+                        decoration: BoxDecoration(
+                          border:
+                              Border.all(color: theme.dividerColor, width: 1.5),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(Icons.add_rounded,
+                            color: theme.colorScheme.primary),
+                      ),
                     ),
-                    child: Icon(Icons.add_rounded, color: theme.colorScheme.primary),
                   ),
-                ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              s(context).photosComingSoon,
+              s(context).photosMaxHint,
               style: theme.textTheme.labelSmall,
             ),
           ),
@@ -475,37 +596,48 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(s(context).prosQuestion, style: theme.textTheme.titleMedium?.copyWith(color: AppColors.positive)),
+          Text(s(context).prosQuestion,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(color: AppColors.positive)),
           const SizedBox(height: 8),
-          _buildProsConsField(theme, _prosController, AppColors.positive, s(context).prosHint),
+          _buildProsConsField(
+              theme, _prosController, AppColors.positive, s(context).prosHint),
           const SizedBox(height: 16),
-          Text(s(context).consQuestion, style: theme.textTheme.titleMedium?.copyWith(color: AppColors.negative)),
+          Text(s(context).consQuestion,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(color: AppColors.negative)),
           const SizedBox(height: 8),
-          _buildProsConsField(theme, _consController, AppColors.negative, s(context).consHint),
+          _buildProsConsField(
+              theme, _consController, AppColors.negative, s(context).consHint),
           const SizedBox(height: 24),
           ChipSelector(
             label: s(context).avgCheckLabel,
             options: _priceLevelKeys.map(_priceLabel).toList(),
             selected: _priceChip == null ? null : _priceLabel(_priceChip!),
-            onSelected: (label) => setState(() => _priceChip = _priceLevelKeys.firstWhere((k) => _priceLabel(k) == label)),
+            onSelected: (label) => setState(() => _priceChip =
+                _priceLevelKeys.firstWhere((k) => _priceLabel(k) == label)),
           ),
           const SizedBox(height: 20),
           ChipSelector(
             label: s(context).withWhomLabel,
             options: _withWhomKeys.map(_withWhomLabel).toList(),
-            selected: _withWhomChip == null ? null : _withWhomLabel(_withWhomChip!),
-            onSelected: (label) => setState(() => _withWhomChip = _withWhomKeys.firstWhere((k) => _withWhomLabel(k) == label)),
+            selected:
+                _withWhomChip == null ? null : _withWhomLabel(_withWhomChip!),
+            onSelected: (label) => setState(() => _withWhomChip =
+                _withWhomKeys.firstWhere((k) => _withWhomLabel(k) == label)),
           ),
           if (_submitError != null) ...[
             const SizedBox(height: 16),
-            Text(_submitError!, style: TextStyle(color: theme.colorScheme.error)),
+            Text(_submitError!,
+                style: TextStyle(color: theme.colorScheme.error)),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildProsConsField(ThemeData theme, TextEditingController controller, Color color, String hint) {
+  Widget _buildProsConsField(ThemeData theme, TextEditingController controller,
+      Color color, String hint) {
     return TextField(
       controller: controller,
       maxLines: 2,
@@ -513,8 +645,12 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         hintText: hint,
         filled: true,
         fillColor: theme.cardColor,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: theme.dividerColor)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: color)),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: theme.dividerColor)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: color)),
       ),
     );
   }
@@ -534,10 +670,13 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                 color: theme.colorScheme.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 48),
+              child: Icon(Icons.check_circle_rounded,
+                  color: theme.colorScheme.primary, size: 48),
             ),
             const SizedBox(height: 20),
-            Text(s(context).reviewPublishedTitle, style: theme.textTheme.headlineMedium, textAlign: TextAlign.center),
+            Text(s(context).reviewPublishedTitle,
+                style: theme.textTheme.headlineMedium,
+                textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
               s(context).reviewPublishedSubtitle,
@@ -567,10 +706,31 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
     };
     final isLastEditableStep = _step == 2;
 
+    // Кнопка "Далее" молча отключается, пока шаг не заполнен — без этой
+    // подсказки это выглядит как "кнопка не работает", хотя на самом деле
+    // просто не хватает обязательных полей.
+    final disabledHint = switch (_step) {
+      0 when !_canProceedFromStep1 => s(context).placeStepHint,
+      1 when _rating == 0 => s(context).rateStepHintNoRating,
+      1 when _textController.text.trim().length < 10 =>
+        s(context).rateStepHintShortText,
+      _ => null,
+    };
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
         children: [
+          if (disabledHint != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                disabledHint,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.colorScheme.error),
+              ),
+            ),
           Row(
             children: [
               if (_step > 0)
@@ -597,9 +757,12 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(isLastEditableStep ? s(context).publishButton : s(context).nextButton),
+                      : Text(isLastEditableStep
+                          ? s(context).publishButton
+                          : s(context).nextButton),
                 ),
               ),
             ],
@@ -615,7 +778,11 @@ class _PlaceOption extends StatelessWidget {
   final bool selected;
   final bool isNew;
   final VoidCallback onTap;
-  const _PlaceOption({required this.name, required this.selected, required this.onTap, this.isNew = false});
+  const _PlaceOption(
+      {required this.name,
+      required this.selected,
+      required this.onTap,
+      this.isNew = false});
 
   @override
   Widget build(BuildContext context) {
@@ -628,13 +795,18 @@ class _PlaceOption extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.cardColor,
+            color: selected
+                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                : theme.cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: selected ? theme.colorScheme.primary : theme.dividerColor),
+            border: Border.all(
+                color:
+                    selected ? theme.colorScheme.primary : theme.dividerColor),
           ),
           child: Row(
             children: [
-              Icon(isNew ? Icons.add_location_alt_rounded : Icons.place_rounded, color: theme.colorScheme.primary, size: 20),
+              Icon(isNew ? Icons.add_location_alt_rounded : Icons.place_rounded,
+                  color: theme.colorScheme.primary, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -642,7 +814,9 @@ class _PlaceOption extends StatelessWidget {
                   style: theme.textTheme.bodyLarge,
                 ),
               ),
-              if (selected) Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 20),
+              if (selected)
+                Icon(Icons.check_circle_rounded,
+                    color: theme.colorScheme.primary, size: 20),
             ],
           ),
         ),
