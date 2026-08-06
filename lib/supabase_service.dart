@@ -8,6 +8,7 @@ import 'screens/home/home_screen.dart';
 import 'screens/place/place_detail_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/review_form/review_form_screen.dart';
+import 'widgets/notification_tile.dart';
 import 'widgets/place_card.dart';
 import 'widgets/place_review_card.dart';
 import 'widgets/review_list_item.dart';
@@ -73,7 +74,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, pros, cons, status, places(name), review_photos(storage_path)')
+            'rating, text, pros, cons, price_level, status, created_at, places(name), review_photos(storage_path)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
@@ -86,11 +87,24 @@ class SupabaseService {
               text: r['text'] as String,
               pros: r['pros'] as String?,
               cons: r['cons'] as String?,
+              priceLevel: r['price_level'] as String?,
+              createdAt: DateTime.parse(r['created_at'] as String),
               photoUrls: _photoUrlsFromRow(r),
               moderationStatus:
                   r['status'] == 'approved' ? null : r['status'] as String?,
             ))
         .toList();
+  }
+
+  /// Сохраняет выбранный язык интерфейса в профиль — читается сервером
+  /// (api/telegram-webhook.js), чтобы отправлять push-уведомления на языке
+  /// пользователя, а не только хранить его локально на устройстве.
+  static Future<void> updatePreferredLanguage(AppLanguage language) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return; // не авторизован — синхронизировать нечего
+    await _client.from('profiles').update({
+      'preferred_language': language == AppLanguage.uz ? 'uz' : 'ru'
+    }).eq('id', userId);
   }
 
   /// Публичный профиль текущего пользователя (шапка экрана "Профиль").
@@ -255,7 +269,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, pros, cons, status, profiles!reviews_user_id_fkey(display_name), review_photos(storage_path)')
+            'rating, text, pros, cons, price_level, status, created_at, profiles!reviews_user_id_fkey(display_name), review_photos(storage_path)')
         .eq('place_id', placeId)
         .order('created_at', ascending: false)
         .limit(limit);
@@ -269,6 +283,8 @@ class SupabaseService {
         text: r['text'] as String,
         pros: r['pros'] as String?,
         cons: r['cons'] as String?,
+        priceLevel: r['price_level'] as String?,
+        createdAt: DateTime.parse(r['created_at'] as String),
         photoUrls: _photoUrlsFromRow(r),
         moderationStatus:
             r['status'] == 'approved' ? null : r['status'] as String?,
@@ -320,7 +336,6 @@ class SupabaseService {
     String? pros,
     String? cons,
     String? priceLevel,
-    String? withWhom,
     required String
         language, // 'ru' | 'uz' — метаданные, не влияет на видимость
     List<Uint8List> photos = const [],
@@ -341,7 +356,6 @@ class SupabaseService {
           'pros': pros,
           'cons': cons,
           'price_level': priceLevel,
-          'with_whom': withWhom,
           'language': language,
           'status': 'pending',
         })
@@ -434,7 +448,7 @@ class SupabaseService {
     final rows = await _client
         .from('review_drafts')
         .select(
-            'id, place_id, place_name_draft, rating, text, pros, cons, price_level, with_whom, updated_at, places(name)')
+            'id, place_id, place_name_draft, rating, text, pros, cons, price_level, updated_at, places(name)')
         .eq('user_id', userId)
         .order('updated_at', ascending: false);
 
@@ -450,7 +464,6 @@ class SupabaseService {
         pros: r['pros'] as String?,
         cons: r['cons'] as String?,
         priceLevel: r['price_level'] as String?,
-        withWhom: r['with_whom'] as String?,
         updatedAt: DateTime.parse(r['updated_at'] as String),
       );
     }).toList();
@@ -467,7 +480,6 @@ class SupabaseService {
     String? pros,
     String? cons,
     String? priceLevel,
-    String? withWhom,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
@@ -481,7 +493,6 @@ class SupabaseService {
       'pros': pros,
       'cons': cons,
       'price_level': priceLevel,
-      'with_whom': withWhom,
       'updated_at': DateTime.now().toIso8601String(),
     };
 
@@ -499,5 +510,51 @@ class SupabaseService {
 
   static Future<void> deleteDraft(String id) async {
     await _client.from('review_drafts').delete().eq('id', id);
+  }
+
+  // ------------------------------------------------------------
+  // Уведомления (in-app; пишутся сервером — см. api/telegram-webhook.js)
+  // ------------------------------------------------------------
+
+  static Future<List<NotificationData>> fetchNotifications() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+
+    final rows = await _client
+        .from('notifications')
+        .select('id, title, body, is_read, created_at')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
+
+    return (rows as List)
+        .map((r) => NotificationData(
+              id: r['id'] as String,
+              title: r['title'] as String,
+              body: r['body'] as String,
+              isRead: r['is_read'] as bool,
+              createdAt: DateTime.parse(r['created_at'] as String),
+            ))
+        .toList();
+  }
+
+  static Future<int> fetchUnreadNotificationsCount() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return 0;
+    final rows = await _client
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_read', false);
+    return (rows as List).length;
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    await _client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('user_id', userId)
+        .eq('is_read', false);
   }
 }

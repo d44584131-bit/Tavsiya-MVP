@@ -37,8 +37,12 @@ class ReviewListItem extends StatelessWidget {
             radius: 20,
             backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.15),
             child: Text(
-              data.authorName.isNotEmpty ? data.authorName[0].toUpperCase() : '?',
-              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+              data.authorName.isNotEmpty
+                  ? data.authorName[0].toUpperCase()
+                  : '?',
+              style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(width: 12),
@@ -49,14 +53,18 @@ class ReviewListItem extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(data.authorName, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                      child: Text(data.authorName,
+                          style: theme.textTheme.titleMedium,
+                          overflow: TextOverflow.ellipsis),
                     ),
                     ...List.generate(
                       5,
                       (i) => Icon(
                         Icons.star_rounded,
                         size: 13,
-                        color: i < data.stars ? AppColors.accentOrange : theme.dividerColor,
+                        color: i < data.stars
+                            ? AppColors.accentOrange
+                            : theme.dividerColor,
                       ),
                     ),
                   ],

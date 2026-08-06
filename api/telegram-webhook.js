@@ -45,16 +45,19 @@ module.exports = async (req, res) => {
 
   const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
-  const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/reviews?id=eq.${reviewId}`, {
-    method: 'PATCH',
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
+  const updateRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${reviewId}&select=user_id,places(name),profiles!reviews_user_id_fkey(preferred_language)`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ status: newStatus }),
     },
-    body: JSON.stringify({ status: newStatus }),
-  });
+  );
 
   if (!updateRes.ok) {
     await answerCallback(botToken, query.id, 'Ошибка обновления');
@@ -64,6 +67,31 @@ module.exports = async (req, res) => {
 
   const label = action === 'approve' ? '✅ Одобрено' : '❌ Отклонено';
   await answerCallback(botToken, query.id, label);
+
+  if (action === 'approve') {
+    const updatedRows = await updateRes.json();
+    const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
+    if (updated?.user_id) {
+      const placeName = updated.places?.name ?? '';
+      const lang = updated.profiles?.preferred_language === 'uz' ? 'uz' : 'ru';
+      const title = lang === 'uz' ? 'Sharhingiz tasdiqlandi' : 'Ваш отзыв одобрен';
+      const body =
+        lang === 'uz'
+          ? `«${placeName}» haqidagi sharhingiz endi hammaga koʻrinadi`
+          : `Отзыв на «${placeName}» теперь виден всем`;
+
+      await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+        method: 'POST',
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ user_id: updated.user_id, title, body }),
+      });
+    }
+  }
 
   const originalText = query.message?.text ?? '';
   if (query.message?.chat?.id && query.message?.message_id) {

@@ -24,7 +24,6 @@ class ReviewDraftData {
   final String? pros;
   final String? cons;
   final String? priceLevel;
-  final String? withWhom;
   final DateTime updatedAt;
 
   const ReviewDraftData({
@@ -36,7 +35,6 @@ class ReviewDraftData {
     this.pros,
     this.cons,
     this.priceLevel,
-    this.withWhom,
     required this.updatedAt,
   });
 }
@@ -76,7 +74,6 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   final _prosController = TextEditingController();
   final _consController = TextEditingController();
   String? _priceChip;
-  String? _withWhomChip;
   bool _isSubmitting = false;
   String? _submitError;
   String?
@@ -90,23 +87,8 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
 
   static const _newPlaceCategoryKeys = ['restaurant', 'cafe', 'park', 'mall'];
   static const _priceLevelKeys = ['budget', 'mid', 'mid_high', 'high'];
-  static const _withWhomKeys = ['alone', 'partner', 'friends', 'family'];
 
-  String _priceLabel(String key) => switch (key) {
-        'budget' => s(context).priceChip0,
-        'mid' => s(context).priceChip1,
-        'mid_high' => s(context).priceChip2,
-        'high' => s(context).priceChip3,
-        _ => key,
-      };
-
-  String _withWhomLabel(String key) => switch (key) {
-        'alone' => s(context).withWhomAlone,
-        'partner' => s(context).withWhomPartner,
-        'friends' => s(context).withWhomFriends,
-        'family' => s(context).withWhomFamily,
-        _ => key,
-      };
+  String _priceLabel(String key) => s(context).priceLevelLabel(key);
 
   @override
   void initState() {
@@ -131,7 +113,6 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       _prosController.text = draft.pros ?? '';
       _consController.text = draft.cons ?? '';
       _priceChip = draft.priceLevel;
-      _withWhomChip = draft.withWhom;
     } else {
       _selectedExistingPlace = widget.preselectedPlace;
     }
@@ -179,7 +160,6 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             ? null
             : _consController.text.trim(),
         priceLevel: _priceChip,
-        withWhom: _withWhomChip,
       );
     } catch (_) {
       // не удалось сохранить черновик — не блокируем закрытие формы
@@ -293,7 +273,6 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             ? null
             : _consController.text.trim(),
         priceLevel: _priceChip,
-        withWhom: _withWhomChip,
         language: widget.language == AppLanguage.uz ? 'uz' : 'ru',
         photos: _photoBytes,
       );
@@ -616,15 +595,6 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             selected: _priceChip == null ? null : _priceLabel(_priceChip!),
             onSelected: (label) => setState(() => _priceChip =
                 _priceLevelKeys.firstWhere((k) => _priceLabel(k) == label)),
-          ),
-          const SizedBox(height: 20),
-          ChipSelector(
-            label: s(context).withWhomLabel,
-            options: _withWhomKeys.map(_withWhomLabel).toList(),
-            selected:
-                _withWhomChip == null ? null : _withWhomLabel(_withWhomChip!),
-            onSelected: (label) => setState(() => _withWhomChip =
-                _withWhomKeys.firstWhere((k) => _withWhomLabel(k) == label)),
           ),
           if (_submitError != null) ...[
             const SizedBox(height: 16),

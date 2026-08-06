@@ -7,13 +7,16 @@ import '../screens/profile/profile_screen.dart' show AppLanguage;
 class AppLanguageScope extends InheritedWidget {
   final AppLanguage language;
 
-  const AppLanguageScope({super.key, required this.language, required super.child});
+  const AppLanguageScope(
+      {super.key, required this.language, required super.child});
 
   static AppLanguage of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<AppLanguageScope>();
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<AppLanguageScope>();
     return scope?.language ?? AppLanguage.ru;
   }
 
   @override
-  bool updateShouldNotify(AppLanguageScope oldWidget) => oldWidget.language != language;
+  bool updateShouldNotify(AppLanguageScope oldWidget) =>
+      oldWidget.language != language;
 }

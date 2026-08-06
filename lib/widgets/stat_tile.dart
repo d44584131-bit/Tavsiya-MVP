@@ -4,7 +4,11 @@ class StatTile extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  const StatTile({super.key, required this.icon, required this.value, required this.label});
+  const StatTile(
+      {super.key,
+      required this.icon,
+      required this.value,
+      required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +26,8 @@ class StatTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(value, style: theme.textTheme.titleMedium),
           const SizedBox(height: 2),
-          Text(label, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
+          Text(label,
+              style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
         ],
       ),
     );

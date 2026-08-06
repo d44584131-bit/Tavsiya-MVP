@@ -32,7 +32,8 @@ class StatusBadge extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary,
                   borderRadius: BorderRadius.circular(10),
@@ -40,14 +41,20 @@ class StatusBadge extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.workspace_premium_rounded, size: 14, color: Colors.white),
+                    const Icon(Icons.workspace_premium_rounded,
+                        size: 14, color: Colors.white),
                     const SizedBox(width: 4),
-                    Text(statusLabel, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text(statusLabel,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
               const Spacer(),
-              Text('$currentPoints / $nextLevelPoints', style: theme.textTheme.labelSmall),
+              Text('$currentPoints / $nextLevelPoints',
+                  style: theme.textTheme.labelSmall),
             ],
           ),
           const SizedBox(height: 10),

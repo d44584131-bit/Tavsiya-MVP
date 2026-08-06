@@ -5,16 +5,22 @@ class StarRatingInput extends StatefulWidget {
   final int value;
   final ValueChanged<int> onChanged;
   final double size;
-  const StarRatingInput({super.key, required this.value, required this.onChanged, this.size = 40});
+  const StarRatingInput(
+      {super.key,
+      required this.value,
+      required this.onChanged,
+      this.size = 40});
 
   @override
   State<StarRatingInput> createState() => _StarRatingInputState();
 }
 
-class _StarRatingInputState extends State<StarRatingInput> with TickerProviderStateMixin {
+class _StarRatingInputState extends State<StarRatingInput>
+    with TickerProviderStateMixin {
   late final List<AnimationController> _controllers = List.generate(
     5,
-    (_) => AnimationController(vsync: this, duration: const Duration(milliseconds: 350)),
+    (_) => AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 350)),
   );
 
   @override

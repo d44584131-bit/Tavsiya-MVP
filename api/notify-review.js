@@ -37,7 +37,7 @@ module.exports = async (req, res) => {
   }
 
   const reviewRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${reviewId}&select=id,rating,text,places(name),profiles!reviews_user_id_fkey(display_name)`,
+    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${reviewId}&select=id,rating,text,pros,cons,price_level,created_at,places(name),profiles!reviews_user_id_fkey(display_name),review_photos(storage_path)`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
   );
   const rows = await reviewRes.json();
@@ -47,17 +47,53 @@ module.exports = async (req, res) => {
     return;
   }
 
+  const PRICE_LABELS = {
+    budget: 'до 50 000',
+    mid: '50–150 тыс',
+    mid_high: '150–300 тыс',
+    high: '300 тыс+',
+  };
+
   const placeName = review.places?.name ?? 'Неизвестное место';
   const authorName = review.profiles?.display_name ?? 'Гость';
   const stars = '⭐'.repeat(review.rating ?? 0);
-  const text = [
+  const date = formatDate(review.created_at);
+
+  const lines = [
     '🆕 Новый отзыв на модерации',
     `Место: ${placeName}`,
     `Автор: ${authorName}`,
     `Оценка: ${stars}`,
-    '',
-    review.text ?? '',
-  ].join('\n');
+    `Дата: ${date}`,
+  ];
+  if (review.price_level) {
+    lines.push(`Средний чек: ${PRICE_LABELS[review.price_level] ?? review.price_level}`);
+  }
+  lines.push('', review.text ?? '');
+  if (review.pros) lines.push('', `👍 Понравилось: ${review.pros}`);
+  if (review.cons) lines.push(`👎 Не понравилось: ${review.cons}`);
+  const text = lines.join('\n');
+
+  const photoUrls = (review.review_photos ?? [])
+    .map((p) => `${SUPABASE_URL}/storage/v1/object/public/review-photos/${p.storage_path}`)
+    .slice(0, 10);
+
+  if (photoUrls.length === 1) {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, photo: photoUrls[0] }),
+    });
+  } else if (photoUrls.length > 1) {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        media: photoUrls.map((url) => ({ type: 'photo', media: url })),
+      }),
+    });
+  }
 
   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
@@ -78,3 +114,9 @@ module.exports = async (req, res) => {
 
   res.status(200).json({ ok: true });
 };
+
+function formatDate(isoString) {
+  const d = new Date(isoString);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+}

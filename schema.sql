@@ -464,3 +464,28 @@ create policy "review_photos_storage_insert" on storage.objects
 
 alter table public.places add column city text not null default 'tashkent';
 create index places_city_idx on public.places (city);
+
+-- =========================================================
+-- МИГРАЦИЯ: notifications (уведомления внутри приложения, например
+-- "ваш отзыв одобрен" после модерации в Telegram)
+-- =========================================================
+-- Пишет только сервер (api/telegram-webhook.js) через service_role, поэтому
+-- insert-политики для обычных пользователей нет — только select/update своих.
+
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  title text not null,
+  body text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index notifications_user_id_idx on public.notifications (user_id, created_at desc);
+
+alter table public.notifications enable row level security;
+
+create policy "notifications_select_own" on public.notifications
+  for select using (auth.uid() = user_id);
+create policy "notifications_update_own" on public.notifications
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);

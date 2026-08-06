@@ -78,11 +78,15 @@ class _AppShellState extends State<AppShell> {
 
   void _openSearch() => _onTabSelected(1);
 
-  Future<void> _openReviewForm({PlaceCardData? place, ReviewDraftData? draft}) async {
+  Future<void> _openReviewForm(
+      {PlaceCardData? place, ReviewDraftData? draft}) async {
     setState(() => _reviewFormActive = true);
     await _navigatorKey.currentState!.push(
       MaterialPageRoute(
-        builder: (_) => ReviewFormScreen(preselectedPlace: place, initialDraft: draft, language: widget.language),
+        builder: (_) => ReviewFormScreen(
+            preselectedPlace: place,
+            initialDraft: draft,
+            language: widget.language),
       ),
     );
     if (mounted) setState(() => _reviewFormActive = false);

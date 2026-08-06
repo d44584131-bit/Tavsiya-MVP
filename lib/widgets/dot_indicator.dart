@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 class DotIndicator extends StatelessWidget {
   final int count;
   final int activeIndex;
-  const DotIndicator({super.key, required this.count, required this.activeIndex});
+  const DotIndicator(
+      {super.key, required this.count, required this.activeIndex});
 
   @override
   Widget build(BuildContext context) {

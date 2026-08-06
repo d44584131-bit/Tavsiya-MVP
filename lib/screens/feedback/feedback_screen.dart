@@ -21,7 +21,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   static const _categoryKeys = ['complaint', 'suggestion'];
 
-  String _categoryLabel(String key) => key == 'complaint' ? s(context).complaintOption : s(context).suggestionOption;
+  String _categoryLabel(String key) => key == 'complaint'
+      ? s(context).complaintOption
+      : s(context).suggestionOption;
 
   @override
   void dispose() {
@@ -77,7 +79,8 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                 label: s(context).feedbackTypeLabel,
                 options: _categoryKeys.map(_categoryLabel).toList(),
                 selected: _categoryLabel(_category),
-                onSelected: (label) => setState(() => _category = _categoryKeys.firstWhere((k) => _categoryLabel(k) == label)),
+                onSelected: (label) => setState(() => _category = _categoryKeys
+                    .firstWhere((k) => _categoryLabel(k) == label)),
               ),
               const SizedBox(height: 16),
               Container(
@@ -105,12 +108,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _controller.text.trim().isEmpty || _isSubmitting ? null : _submit,
+                  onPressed: _controller.text.trim().isEmpty || _isSubmitting
+                      ? null
+                      : _submit,
                   child: _isSubmitting
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : Text(s(context).sendButton),
                 ),

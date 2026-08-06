@@ -39,37 +39,50 @@ class PlaceListTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(16)),
                 child: Container(
                   width: 100,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: AppColors.headerGradient(data.category, isDark: isDark),
+                      colors: AppColors.headerGradient(data.category,
+                          isDark: isDark),
                     ),
                   ),
-                  child: Icon(_categoryIcon(data.category), color: Colors.white.withValues(alpha: 0.9), size: 32),
+                  child: Icon(_categoryIcon(data.category),
+                      color: Colors.white.withValues(alpha: 0.9), size: 32),
                 ),
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(data.name, style: theme.textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(data.name,
+                          style: theme.textTheme.titleMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 4),
-                      Text(data.district, style: theme.textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(data.district,
+                          style: theme.textTheme.labelSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded, size: 15, color: AppColors.accentOrange),
+                          const Icon(Icons.star_rounded,
+                              size: 15, color: AppColors.accentOrange),
                           const SizedBox(width: 3),
-                          Text(data.rating.toStringAsFixed(1), style: theme.textTheme.labelSmall),
+                          Text(data.rating.toStringAsFixed(1),
+                              style: theme.textTheme.labelSmall),
                           const SizedBox(width: 4),
-                          Text('(${data.reviewsCount})', style: theme.textTheme.labelSmall),
+                          Text('(${data.reviewsCount})',
+                              style: theme.textTheme.labelSmall),
                         ],
                       ),
                     ],

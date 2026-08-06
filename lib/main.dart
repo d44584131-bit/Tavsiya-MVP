@@ -133,6 +133,11 @@ class _TavsiyaAppState extends State<TavsiyaApp> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _prefsLanguageKey, lang == AppLanguage.uz ? 'uz' : 'ru');
+    try {
+      await SupabaseService.updatePreferredLanguage(lang);
+    } catch (_) {
+      // не блокируем смену языка в интерфейсе из-за сетевой ошибки
+    }
   }
 
   Future<void> _setCity(String city) async {
@@ -189,7 +194,13 @@ class _TavsiyaAppState extends State<TavsiyaApp> {
             ),
           _Flow.auth => AuthScreen(
               dismissible: false,
-              onAuthenticated: () => setState(() => _flow = _Flow.main),
+              onAuthenticated: () {
+                // язык мог быть выбран в онбординге до входа/регистрации —
+                // profiles.preferred_language синхронизируем только теперь,
+                // когда появилась сессия.
+                SupabaseService.updatePreferredLanguage(_language);
+                setState(() => _flow = _Flow.main);
+              },
             ),
           _Flow.main => AppShell(
               key: ValueKey(_city),

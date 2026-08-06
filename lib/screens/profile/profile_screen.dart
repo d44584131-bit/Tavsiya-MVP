@@ -12,6 +12,7 @@ import '../../widgets/place_list_tile.dart';
 import '../../widgets/place_review_card.dart';
 import '../auth/auth_screen.dart';
 import '../feedback/feedback_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../review_form/review_form_screen.dart' show ReviewDraftData;
 
 enum AppLanguage { ru, uz }
@@ -73,6 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   List<PlaceCardData> _savedPlaces = const [];
   List<ReviewDraftData> _drafts = const [];
   int _savedSubTab = 0; // 0 = места, 1 = отзывы
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
@@ -109,6 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         _myReviews = const [];
         _savedPlaces = const [];
         _drafts = const [];
+        _unreadNotifications = 0;
       });
       return;
     }
@@ -122,6 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         SupabaseService.fetchMyReviews(language: widget.language),
         SupabaseService.fetchSavedPlaces(),
         SupabaseService.fetchMyDrafts(),
+        SupabaseService.fetchUnreadNotificationsCount(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -129,6 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         _myReviews = results[1] as List<PlaceReviewData>;
         _savedPlaces = results[2] as List<PlaceCardData>;
         _drafts = results[3] as List<ReviewDraftData>;
+        _unreadNotifications = results[4] as int;
         _isLoading = false;
       });
     } catch (_) {
@@ -172,6 +177,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  Future<void> _openNotifications() async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    if (!mounted) return;
+    setState(() => _unreadNotifications = 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -180,6 +192,15 @@ class _ProfileScreenState extends State<ProfileScreen>
       appBar: AppBar(
         title: Text(s(context).profileTitle),
         actions: [
+          if (SupabaseService.currentUser != null)
+            IconButton(
+              icon: Badge(
+                isLabelVisible: _unreadNotifications > 0,
+                label: Text('$_unreadNotifications'),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              onPressed: _openNotifications,
+            ),
           IconButton(
               icon: const Icon(Icons.settings_outlined),
               onPressed: _openSettings),

@@ -235,15 +235,17 @@ class Strings {
   String get consHint =>
       _t('Например: долго ждали, шумно', 'Masalan: uzoq kutdik, shovqinli');
   String get avgCheckLabel => _t('Средний чек', 'Oʻrtacha chek');
-  String get withWhomLabel => _t('С кем были', 'Kim bilan bordingiz');
   String get priceChip0 => _t('до 50 000', '50 000 gacha');
   String get priceChip1 => _t('50–150 тыс', '50–150 ming');
   String get priceChip2 => _t('150–300 тыс', '150–300 ming');
   String get priceChip3 => _t('300 тыс+', '300 ming+');
-  String get withWhomAlone => _t('Один(а)', 'Yolgʻiz');
-  String get withWhomPartner => _t('С партнёром', 'Sherik bilan');
-  String get withWhomFriends => _t('С друзьями', 'Doʻstlar bilan');
-  String get withWhomFamily => _t('С семьёй', 'Oila bilan');
+  String priceLevelLabel(String key) => switch (key) {
+        'budget' => priceChip0,
+        'mid' => priceChip1,
+        'mid_high' => priceChip2,
+        'high' => priceChip3,
+        _ => key,
+      };
   String get reviewSubmitError => _t(
       'Не удалось отправить отзыв. Проверьте подключение и попробуйте снова',
       'Sharhni yuborib boʻlmadi. Ulanishni tekshirib, qayta urinib koʻring');
@@ -283,6 +285,21 @@ class Strings {
       _t('оставить отзыв', 'sharh qoldirish');
   String get authRequiredActionSave => _t('сохранить место', 'joyni saqlash');
   String get cancelButton => _t('Отмена', 'Bekor qilish');
+  String get reviewApprovedPushTitle =>
+      _t('Ваш отзыв одобрен', 'Sharhingiz tasdiqlandi');
+  String reviewApprovedPushBody(String placeName) => _t(
+      'Отзыв на «$placeName» теперь виден всем',
+      '«$placeName» haqidagi sharhingiz endi hammaga koʻrinadi');
+
+  // ---------------------------------------------------------------
+  // Уведомления (notifications_screen.dart)
+  // ---------------------------------------------------------------
+  String get notificationsTitle => _t('Уведомления', 'Bildirishnomalar');
+  String get noNotificationsTitle =>
+      _t('Пока нет уведомлений', 'Hozircha bildirishnomalar yoʻq');
+  String get noNotificationsSubtitle => _t(
+      'Здесь появятся уведомления, например об одобрении отзыва',
+      'Bu yerda bildirishnomalar paydo boʻladi, masalan sharh tasdiqlanganda');
   String get usefulLabel => _t('Полезно', 'Foydali');
   String get savedLabel => _t('Сохранено', 'Saqlangan');
   String get followersLabel => _t('Подписчиков', 'Obunachilar');

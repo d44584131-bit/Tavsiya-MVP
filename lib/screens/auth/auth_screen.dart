@@ -39,7 +39,9 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _authSub = SupabaseService.authStateChanges.listen((_) {
-      if (!mounted || _handledAuth || SupabaseService.currentUser == null) return;
+      if (!mounted || _handledAuth || SupabaseService.currentUser == null) {
+        return;
+      }
       _handledAuth = true;
       if (widget.onAuthenticated != null) {
         widget.onAuthenticated!();
@@ -156,12 +158,16 @@ class _AuthScreenState extends State<AuthScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _isSignUp ? s(context).createAccountTitle : s(context).welcomeBackTitle,
+                _isSignUp
+                    ? s(context).createAccountTitle
+                    : s(context).welcomeBackTitle,
                 style: theme.textTheme.headlineLarge,
               ),
               const SizedBox(height: 6),
               Text(
-                _isSignUp ? s(context).signUpSubtitle : s(context).signInSubtitleAuth,
+                _isSignUp
+                    ? s(context).signUpSubtitle
+                    : s(context).signInSubtitleAuth,
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 28),
@@ -170,7 +176,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
                   icon: _isGoogleSubmitting
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const _GoogleLogo(),
                   label: Text(s(context).continueWithGoogle),
                 ),
@@ -181,14 +190,18 @@ class _AuthScreenState extends State<AuthScreen> {
                   Expanded(child: Divider(color: theme.dividerColor)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(s(context).orDivider, style: theme.textTheme.labelSmall),
+                    child: Text(s(context).orDivider,
+                        style: theme.textTheme.labelSmall),
                   ),
                   Expanded(child: Divider(color: theme.dividerColor)),
                 ],
               ),
               const SizedBox(height: 20),
               if (_isSignUp) ...[
-                _buildField(theme, controller: _nameController, hint: s(context).nameHint, icon: Icons.person_outline_rounded),
+                _buildField(theme,
+                    controller: _nameController,
+                    hint: s(context).nameHint,
+                    icon: Icons.person_outline_rounded),
                 const SizedBox(height: 12),
               ],
               _buildField(
@@ -219,9 +232,12 @@ class _AuthScreenState extends State<AuthScreen> {
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(_isSignUp ? s(context).signUpButton : s(context).signInButton),
+                      : Text(_isSignUp
+                          ? s(context).signUpButton
+                          : s(context).signInButton),
                 ),
               ),
               const SizedBox(height: 16),
@@ -234,7 +250,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             _error = null;
                           }),
                   child: Text(
-                    _isSignUp ? s(context).haveAccountToggle : s(context).noAccountToggle,
+                    _isSignUp
+                        ? s(context).haveAccountToggle
+                        : s(context).noAccountToggle,
                   ),
                 ),
               ),
@@ -320,7 +338,8 @@ class _GoogleLogoPainter extends CustomPainter {
     // горизонтальная перекладина "G"
     final barPaint = Paint()..color = const Color(0xFF4285F4);
     canvas.drawRect(
-      Rect.fromLTWH(center.dx, center.dy - strokeWidth / 2, radius - strokeWidth * 0.3, strokeWidth),
+      Rect.fromLTWH(center.dx, center.dy - strokeWidth / 2,
+          radius - strokeWidth * 0.3, strokeWidth),
       barPaint,
     );
   }

@@ -11,13 +11,15 @@ class CollectionsListScreen extends StatelessWidget {
   final List<CollectionData> collections;
   final void Function(PlaceCardData place)? onPlaceTap;
 
-  const CollectionsListScreen({super.key, required this.collections, this.onPlaceTap});
+  const CollectionsListScreen(
+      {super.key, required this.collections, this.onPlaceTap});
 
   void _openCollection(BuildContext context, CollectionData collection) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => PlaceListScreen(
         title: collection.title,
-        fetcher: ({required offset, required limit}) async => collection.places.skip(offset).take(limit).toList(),
+        fetcher: ({required offset, required limit}) async =>
+            collection.places.skip(offset).take(limit).toList(),
         onPlaceTap: (p) => onPlaceTap?.call(p),
       ),
     ));
@@ -33,7 +35,9 @@ class CollectionsListScreen extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, i) {
           final collection = collections[i];
-          return _CollectionCard(data: collection, onTap: () => _openCollection(context, collection));
+          return _CollectionCard(
+              data: collection,
+              onTap: () => _openCollection(context, collection));
         },
       ),
     );
@@ -48,7 +52,8 @@ class _CollectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final gradientKey = data.places.isNotEmpty ? data.places.first.category : 'restaurant';
+    final gradientKey =
+        data.places.isNotEmpty ? data.places.first.category : 'restaurant';
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -59,7 +64,8 @@ class _CollectionCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: AppColors.headerGradient(gradientKey, isDark: theme.brightness == Brightness.dark),
+            colors: AppColors.headerGradient(gradientKey,
+                isDark: theme.brightness == Brightness.dark),
           ),
           borderRadius: BorderRadius.circular(18),
         ),
@@ -70,9 +76,16 @@ class _CollectionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(data.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                  Text(data.title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16)),
                   const SizedBox(height: 4),
-                  Text(s(context).placesCount(data.places.length), style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
+                  Text(s(context).placesCount(data.places.length),
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 12)),
                 ],
               ),
             ),

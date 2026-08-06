@@ -17,13 +17,18 @@ Future<bool> ensureAuthenticated(BuildContext context, String action) async {
       title: Text(s(context).authRequiredTitle),
       content: Text(s(context).authRequiredMessage(action)),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(s(context).cancelButton)),
-        FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(s(context).signInButton)),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(s(context).cancelButton)),
+        FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(s(context).signInButton)),
       ],
     ),
   );
   if (shouldSignIn != true || !context.mounted) return false;
 
-  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
+  await Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => const AuthScreen()));
   return SupabaseService.currentUser != null;
 }

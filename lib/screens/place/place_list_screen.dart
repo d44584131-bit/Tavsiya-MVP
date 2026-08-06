@@ -10,10 +10,15 @@ import '../../widgets/place_list_tile.dart';
 /// список места может быть большим, грузить всё разом не нужно.
 class PlaceListScreen extends StatefulWidget {
   final String title;
-  final Future<List<PlaceCardData>> Function({required int offset, required int limit}) fetcher;
+  final Future<List<PlaceCardData>> Function(
+      {required int offset, required int limit}) fetcher;
   final void Function(PlaceCardData place) onPlaceTap;
 
-  const PlaceListScreen({super.key, required this.title, required this.fetcher, required this.onPlaceTap});
+  const PlaceListScreen(
+      {super.key,
+      required this.title,
+      required this.fetcher,
+      required this.onPlaceTap});
 
   @override
   State<PlaceListScreen> createState() => _PlaceListScreenState();
@@ -44,7 +49,8 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
 
   void _onScroll() {
     if (!_hasMore || _isLoadingMore || _isLoading) return;
-    if (_scrollController.position.pixels > _scrollController.position.maxScrollExtent - 300) {
+    if (_scrollController.position.pixels >
+        _scrollController.position.maxScrollExtent - 300) {
       _loadMore();
     }
   }
@@ -74,7 +80,8 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
   Future<void> _loadMore() async {
     setState(() => _isLoadingMore = true);
     try {
-      final more = await widget.fetcher(offset: _places.length, limit: _pageSize);
+      final more =
+          await widget.fetcher(offset: _places.length, limit: _pageSize);
       if (!mounted) return;
       setState(() {
         _places = [..._places, ...more];
@@ -132,7 +139,8 @@ class _PlaceListScreenState extends State<PlaceListScreen> {
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
-        return PlaceListTile(data: _places[i], onTap: () => widget.onPlaceTap(_places[i]));
+        return PlaceListTile(
+            data: _places[i], onTap: () => widget.onPlaceTap(_places[i]));
       },
     );
   }
