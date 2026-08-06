@@ -39,16 +39,15 @@ class _BusinessScreenState extends State<BusinessScreen> {
       _hasError = false;
     });
     try {
-      final results = await Future.wait([
-        SupabaseService.fetchOwnedPlaces(),
-        SupabaseService.fetchUnreadNotificationsCount(),
-      ]);
+      final places = await SupabaseService.fetchOwnedPlaces();
       if (!mounted) return;
       setState(() {
-        _places = results[0] as List<PlaceCardData>;
-        _unreadNotifications = results[1] as int;
+        _places = places;
         _isLoading = false;
       });
+      SupabaseService.fetchUnreadNotificationsCount().then((count) {
+        if (mounted) setState(() => _unreadNotifications = count);
+      }).catchError((_) {});
     } catch (_) {
       if (!mounted) return;
       setState(() {

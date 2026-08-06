@@ -126,7 +126,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         SupabaseService.fetchMyReviews(language: widget.language),
         SupabaseService.fetchSavedPlaces(),
         SupabaseService.fetchMyDrafts(),
-        SupabaseService.fetchUnreadNotificationsCount(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -134,9 +133,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         _myReviews = results[1] as List<PlaceReviewData>;
         _savedPlaces = results[2] as List<PlaceCardData>;
         _drafts = results[3] as List<ReviewDraftData>;
-        _unreadNotifications = results[4] as int;
         _isLoading = false;
       });
+      // отдельно и не блокируя основной профиль — если таблица notifications
+      // ещё не создана (миграция не применена), это не должно ронять весь экран
+      SupabaseService.fetchUnreadNotificationsCount().then((count) {
+        if (mounted) setState(() => _unreadNotifications = count);
+      }).catchError((_) {});
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -159,6 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => _SettingsSheet(
         language: widget.language,
         themeMode: widget.themeMode,
@@ -568,117 +572,125 @@ class _SettingsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                  color: theme.dividerColor,
-                  borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          Text(s(context).languageSectionTitle,
-              style: theme.textTheme.titleMedium),
-          const SizedBox(height: 10),
-          Row(
+    return ConstrainedBox(
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom + 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _SegmentButton(
-                  label: 'Русский',
-                  selected: language == AppLanguage.ru,
-                  onTap: () => onLanguageChanged(AppLanguage.ru),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                      color: theme.dividerColor,
+                      borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SegmentButton(
-                  label: "O'zbekcha",
-                  selected: language == AppLanguage.uz,
-                  onTap: () => onLanguageChanged(AppLanguage.uz),
+              Text(s(context).languageSectionTitle,
+                  style: theme.textTheme.titleMedium),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SegmentButton(
+                      label: 'Русский',
+                      selected: language == AppLanguage.ru,
+                      onTap: () => onLanguageChanged(AppLanguage.ru),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _SegmentButton(
+                      label: "O'zbekcha",
+                      selected: language == AppLanguage.uz,
+                      onTap: () => onLanguageChanged(AppLanguage.uz),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(s(context).themeSectionTitle,
+                  style: theme.textTheme.titleMedium),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SegmentButton(
+                      label: s(context).themeSystem,
+                      selected: themeMode == AppThemeMode.system,
+                      onTap: () => onThemeModeChanged(AppThemeMode.system),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SegmentButton(
+                      label: s(context).themeLight,
+                      icon: Icons.light_mode_rounded,
+                      selected: themeMode == AppThemeMode.light,
+                      onTap: () => onThemeModeChanged(AppThemeMode.light),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _SegmentButton(
+                      label: s(context).themeDark,
+                      icon: Icons.dark_mode_rounded,
+                      selected: themeMode == AppThemeMode.dark,
+                      onTap: () => onThemeModeChanged(AppThemeMode.dark),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (isSignedIn) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onBusiness,
+                    icon: const Icon(Icons.storefront_outlined),
+                    label: Text(s(context).businessEntryButton),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onFeedback,
+                  icon: const Icon(Icons.flag_outlined),
+                  label: Text(s(context).feedbackButton),
                 ),
               ),
+              if (isSignedIn) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onSignOut,
+                    icon: const Icon(Icons.logout_rounded),
+                    label: Text(s(context).signOutButton),
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 24),
-          Text(s(context).themeSectionTitle,
-              style: theme.textTheme.titleMedium),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _SegmentButton(
-                  label: s(context).themeSystem,
-                  selected: themeMode == AppThemeMode.system,
-                  onTap: () => onThemeModeChanged(AppThemeMode.system),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _SegmentButton(
-                  label: s(context).themeLight,
-                  icon: Icons.light_mode_rounded,
-                  selected: themeMode == AppThemeMode.light,
-                  onTap: () => onThemeModeChanged(AppThemeMode.light),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SegmentButton(
-                  label: s(context).themeDark,
-                  icon: Icons.dark_mode_rounded,
-                  selected: themeMode == AppThemeMode.dark,
-                  onTap: () => onThemeModeChanged(AppThemeMode.dark),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          if (isSignedIn) ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onBusiness,
-                icon: const Icon(Icons.storefront_outlined),
-                label: Text(s(context).businessEntryButton),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onFeedback,
-              icon: const Icon(Icons.flag_outlined),
-              label: Text(s(context).feedbackButton),
-            ),
-          ),
-          if (isSignedIn) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onSignOut,
-                icon: const Icon(Icons.logout_rounded),
-                label: Text(s(context).signOutButton),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
