@@ -21,6 +21,7 @@ class PlaceDetailData {
   final bool isVerified;
   final double rating;
   final int reviewsCount;
+  final String? status; // 'pending' | 'rejected' | null (= approved)
 
   const PlaceDetailData({
     required this.id,
@@ -35,6 +36,7 @@ class PlaceDetailData {
     required this.isVerified,
     required this.rating,
     required this.reviewsCount,
+    this.status,
   });
 
   static const _priceLevelLabels = {
@@ -73,12 +75,13 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
   String? _error;
   PlaceDetailData? _place;
   List<PlaceReviewData> _reviews = const [];
+  List<String> _officialPhotos = const [];
   bool _isSaved = false;
   bool _isTogglingSave = false;
 
-  /// Фото места собираются из тех, что посетители прикрепили к своим отзывам
-  /// (своей отдельной загрузки фото места пока нет) — используются и в
-  /// карусели шапки, и во вкладке "Фото".
+  /// Фото, приложенные посетителями к своим отзывам — остаются только в
+  /// отзывах и во вкладке "Фото", не смешиваются с официальными фото места
+  /// (_officialPhotos), которые показываются в карусели шапки.
   List<String> get _allPhotos => _reviews.expand((r) => r.photoUrls).toList();
 
   @override
@@ -104,12 +107,14 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         SupabaseService.fetchApprovedReviews(widget.placeId,
             language: widget.language),
         SupabaseService.isPlaceSaved(widget.placeId),
+        SupabaseService.fetchPlacePhotos(widget.placeId),
       ]);
       if (!mounted) return;
       setState(() {
         _place = results[0] as PlaceDetailData;
         _reviews = results[1] as List<PlaceReviewData>;
         _isSaved = results[2] as bool;
+        _officialPhotos = results[3] as List<String>;
         _isLoading = false;
       });
     } catch (_) {
@@ -199,7 +204,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (_allPhotos.isEmpty)
+                  if (_officialPhotos.isEmpty)
                     Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -214,9 +219,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
                     PageView.builder(
                       controller: _photoPageController,
                       onPageChanged: (i) => setState(() => _photoPageIndex = i),
-                      itemCount: _allPhotos.length,
+                      itemCount: _officialPhotos.length,
                       itemBuilder: (context, i) => Image.network(
-                        _allPhotos[i],
+                        _officialPhotos[i],
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, progress) =>
                             progress == null
@@ -252,7 +257,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
                       ),
                     ),
                   ),
-                  if (_allPhotos.length > 1)
+                  if (_officialPhotos.length > 1)
                     Positioned(
                       bottom: 12,
                       left: 0,
@@ -260,7 +265,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
-                          _allPhotos.length,
+                          _officialPhotos.length,
                           (i) => AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             width: i == _photoPageIndex ? 16 : 6,

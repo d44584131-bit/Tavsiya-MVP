@@ -11,6 +11,7 @@ import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
 import '../../widgets/place_review_card.dart';
 import '../auth/auth_screen.dart';
+import '../business/business_screen.dart';
 import '../feedback/feedback_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../review_form/review_form_screen.dart' show ReviewDraftData;
@@ -172,6 +173,11 @@ class _ProfileScreenState extends State<ProfileScreen>
           Navigator.of(context).pop();
           Navigator.of(context)
               .push(MaterialPageRoute(builder: (_) => const FeedbackScreen()));
+        },
+        onBusiness: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => BusinessScreen(language: widget.language)));
         },
       ),
     );
@@ -546,6 +552,7 @@ class _SettingsSheet extends StatelessWidget {
   final bool isSignedIn;
   final VoidCallback onSignOut;
   final VoidCallback onFeedback;
+  final VoidCallback onBusiness;
 
   const _SettingsSheet({
     required this.language,
@@ -555,6 +562,7 @@ class _SettingsSheet extends StatelessWidget {
     required this.isSignedIn,
     required this.onSignOut,
     required this.onFeedback,
+    required this.onBusiness,
   });
 
   @override
@@ -640,6 +648,17 @@ class _SettingsSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          if (isSignedIn) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onBusiness,
+                icon: const Icon(Icons.storefront_outlined),
+                label: Text(s(context).businessEntryButton),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(

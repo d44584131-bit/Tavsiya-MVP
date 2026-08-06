@@ -1,6 +1,7 @@
 // Принимает вебхуки от Telegram: обрабатывает нажатия кнопок
 // "Одобрить"/"Отклонить" под уведомлением о новом отзыве
-// (см. api/notify-review.js) и обновляет статус отзыва в Supabase.
+// (см. api/notify-review.js) или новом заведении (api/notify-place.js) и
+// обновляет соответствующий статус в Supabase.
 //
 // Настройка (один раз, после того как заданы переменные окружения):
 //   https://api.telegram.org/bot<TOKEN>/setWebhook?url=<адрес сайта>/api/telegram-webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
@@ -35,63 +36,28 @@ module.exports = async (req, res) => {
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const [action, reviewId] = String(query.data ?? '').split(':');
+  const sep = String(query.data ?? '').lastIndexOf(':');
+  const prefix = sep === -1 ? String(query.data ?? '') : query.data.slice(0, sep);
+  const id = sep === -1 ? '' : query.data.slice(sep + 1);
 
-  if (!['approve', 'reject'].includes(action) || !reviewId) {
+  let label;
+  if (['approve', 'reject'].includes(prefix) && id) {
+    label = await moderateReview({ id, approve: prefix === 'approve', botToken, serviceKey });
+  } else if (['place_approve', 'place_reject'].includes(prefix) && id) {
+    label = await moderatePlace({ id, approve: prefix === 'place_approve', botToken, serviceKey });
+  } else {
     await answerCallback(botToken, query.id, 'Некорректная кнопка');
     res.status(200).json({ ok: true });
     return;
   }
 
-  const newStatus = action === 'approve' ? 'approved' : 'rejected';
-
-  const updateRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${reviewId}&select=user_id,places(name),profiles!reviews_user_id_fkey(preferred_language)`,
-    {
-      method: 'PATCH',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation',
-      },
-      body: JSON.stringify({ status: newStatus }),
-    },
-  );
-
-  if (!updateRes.ok) {
+  if (label === null) {
     await answerCallback(botToken, query.id, 'Ошибка обновления');
     res.status(200).json({ ok: true });
     return;
   }
 
-  const label = action === 'approve' ? '✅ Одобрено' : '❌ Отклонено';
   await answerCallback(botToken, query.id, label);
-
-  if (action === 'approve') {
-    const updatedRows = await updateRes.json();
-    const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
-    if (updated?.user_id) {
-      const placeName = updated.places?.name ?? '';
-      const lang = updated.profiles?.preferred_language === 'uz' ? 'uz' : 'ru';
-      const title = lang === 'uz' ? 'Sharhingiz tasdiqlandi' : 'Ваш отзыв одобрен';
-      const body =
-        lang === 'uz'
-          ? `«${placeName}» haqidagi sharhingiz endi hammaga koʻrinadi`
-          : `Отзыв на «${placeName}» теперь виден всем`;
-
-      await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
-        method: 'POST',
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({ user_id: updated.user_id, title, body }),
-      });
-    }
-  }
 
   const originalText = query.message?.text ?? '';
   if (query.message?.chat?.id && query.message?.message_id) {
@@ -108,6 +74,96 @@ module.exports = async (req, res) => {
 
   res.status(200).json({ ok: true });
 };
+
+/// Одобрение/отклонение отзыва. При одобрении пишет автору in-app
+/// уведомление на его языке интерфейса (profiles.preferred_language).
+async function moderateReview({ id, approve, botToken, serviceKey }) {
+  const newStatus = approve ? 'approved' : 'rejected';
+
+  const updateRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${id}&select=user_id,places(name),profiles!reviews_user_id_fkey(preferred_language)`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ status: newStatus }),
+    },
+  );
+  if (!updateRes.ok) return null;
+
+  if (approve) {
+    const rows = await updateRes.json();
+    const updated = Array.isArray(rows) ? rows[0] : null;
+    if (updated?.user_id) {
+      const placeName = updated.places?.name ?? '';
+      const lang = updated.profiles?.preferred_language === 'uz' ? 'uz' : 'ru';
+      const title = lang === 'uz' ? 'Izohingiz eʼlon qilindi' : 'Комментарий опубликован';
+      const body =
+        lang === 'uz'
+          ? `«${placeName}» uchun izohingiz eʼlon qilindi`
+          : `Комментарий на «${placeName}» опубликован`;
+      await insertNotification({ userId: updated.user_id, title, body, serviceKey });
+    }
+  }
+
+  return approve ? '✅ Одобрено' : '❌ Отклонено';
+}
+
+/// Одобрение/отклонение нового заведения. При одобрении место становится
+/// видно всем (RLS: places_select_approved_or_own) и владелец получает
+/// in-app уведомление на своём языке интерфейса.
+async function moderatePlace({ id, approve, botToken, serviceKey }) {
+  const newStatus = approve ? 'approved' : 'rejected';
+
+  const updateRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/places?id=eq.${id}&select=name,created_by,profiles!places_created_by_fkey(preferred_language)`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ status: newStatus }),
+    },
+  );
+  if (!updateRes.ok) return null;
+
+  if (approve) {
+    const rows = await updateRes.json();
+    const updated = Array.isArray(rows) ? rows[0] : null;
+    if (updated?.created_by) {
+      const placeName = updated.name ?? '';
+      const lang = updated.profiles?.preferred_language === 'uz' ? 'uz' : 'ru';
+      const title = lang === 'uz' ? 'Muassasangiz qoʻshildi' : 'Ваше заведение добавлено';
+      const body =
+        lang === 'uz'
+          ? `«${placeName}» endi foydalanuvchilarga koʻrinadi`
+          : `«${placeName}» теперь виден пользователям`;
+      await insertNotification({ userId: updated.created_by, title, body, serviceKey });
+    }
+  }
+
+  return approve ? '✅ Одобрено' : '❌ Отклонено';
+}
+
+async function insertNotification({ userId, title, body, serviceKey }) {
+  await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ user_id: userId, title, body }),
+  });
+}
 
 async function answerCallback(botToken, callbackQueryId, text) {
   await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {

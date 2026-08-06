@@ -47,4 +47,19 @@ class FeedbackService {
       throw Exception('Не удалось отправить уведомление о модерации');
     }
   }
+
+  /// Уведомляет администратора в Telegram о новом заведении на модерации
+  /// (`api/notify-place.js`) — вся информация для проверки (название,
+  /// категория, описание, адрес, телефон, сайт) с кнопками
+  /// "Одобрить"/"Отклонить"; появляется в приложении только после одобрения.
+  static Future<void> notifyNewPlace(String placeId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/notify-place'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'placeId': placeId}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось отправить уведомление о модерации');
+    }
+  }
 }

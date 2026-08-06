@@ -489,3 +489,143 @@ create policy "notifications_select_own" on public.notifications
   for select using (auth.uid() = user_id);
 create policy "notifications_update_own" on public.notifications
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- =========================================================
+-- МИГРАЦИЯ: storage bucket для официальных фото места (карусель в шапке
+-- профиля места — отдельно от фото, которые посетители прикладывают к
+-- отзывам; таблица public.place_photos и её RLS-политики уже были в базовой
+-- схеме, не хватало только бакета для самих файлов)
+-- =========================================================
+
+insert into storage.buckets (id, name, public)
+values ('place-photos', 'place-photos', true)
+on conflict (id) do nothing;
+
+create policy "place_photos_storage_select" on storage.objects
+  for select using (bucket_id = 'place-photos');
+create policy "place_photos_storage_insert" on storage.objects
+  for insert with check (bucket_id = 'place-photos' and auth.uid() is not null);
+
+-- =========================================================
+-- МИГРАЦИЯ: аккаунт заведения (place_owners) — редактирование профиля
+-- места, официальных фото и просмотр отзывов из профиля пользователя
+-- ("Войти как заведение")
+-- =========================================================
+-- Тот же логин, что и у обычного пользователя: если он владеет местом
+-- (есть строка в place_owners), в профиле открывается управление этим
+-- местом. Владение проставляется автоматически: кто создаёт место
+-- (places.created_by), тот и становится его владельцем — работает и для
+-- быстрого добавления места из формы отзыва, и для полной формы в разделе
+-- "Заведение".
+
+create table public.place_owners (
+  place_id uuid not null references public.places (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (place_id, user_id)
+);
+
+create index place_owners_user_idx on public.place_owners (user_id);
+
+alter table public.place_owners enable row level security;
+
+create policy "place_owners_select_own" on public.place_owners
+  for select using (auth.uid() = user_id);
+
+create or replace function public.handle_new_place_owner()
+returns trigger as $$
+begin
+  if new.created_by is not null then
+    insert into public.place_owners (place_id, user_id)
+    values (new.id, new.created_by)
+    on conflict do nothing;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists trg_place_owner_on_insert on public.places;
+create trigger trg_place_owner_on_insert
+  after insert on public.places
+  for each row execute function public.handle_new_place_owner();
+
+-- владелец может редактировать своё место (имя/категория/описание/адрес/
+-- телефон/сайт/средний чек); insert-политика места не нужна — новые места
+-- создаются как и раньше через places_insert_authenticated.
+create policy "places_update_own" on public.places
+  for update using (
+    exists (
+      select 1 from public.place_owners po
+      where po.place_id = places.id and po.user_id = auth.uid()
+    )
+  ) with check (
+    exists (
+      select 1 from public.place_owners po
+      where po.place_id = places.id and po.user_id = auth.uid()
+    )
+  );
+
+-- официальные фото места — теперь может добавлять/удалять только владелец
+-- (раньше место_photos_insert_authenticated разрешал это любому
+-- авторизованному пользователю — ужесточаем).
+drop policy if exists "place_photos_insert_authenticated" on public.place_photos;
+create policy "place_photos_insert_owner" on public.place_photos
+  for insert with check (
+    exists (
+      select 1 from public.place_owners po
+      where po.place_id = place_photos.place_id and po.user_id = auth.uid()
+    )
+  );
+create policy "place_photos_delete_owner" on public.place_photos
+  for delete using (
+    exists (
+      select 1 from public.place_owners po
+      where po.place_id = place_photos.place_id and po.user_id = auth.uid()
+    )
+  );
+
+-- то же самое — на уровне файлов в сторадже: путь файла начинается с
+-- {place_id}/..., владение проверяем через тот же place_owners.
+drop policy if exists "place_photos_storage_insert" on storage.objects;
+create policy "place_photos_storage_insert_owner" on storage.objects
+  for insert with check (
+    bucket_id = 'place-photos'
+    and exists (
+      select 1 from public.place_owners po
+      where po.place_id = (split_part(name, '/', 1))::uuid
+        and po.user_id = auth.uid()
+    )
+  );
+create policy "place_photos_storage_delete_owner" on storage.objects
+  for delete using (
+    bucket_id = 'place-photos'
+    and exists (
+      select 1 from public.place_owners po
+      where po.place_id = (split_part(name, '/', 1))::uuid
+        and po.user_id = auth.uid()
+    )
+  );
+
+-- =========================================================
+-- МИГРАЦИЯ: модерация новых мест через Telegram (как у отзывов) — прежде
+-- чем место появится в приложении для всех, вся информация уходит на
+-- проверку админу в Telegram (api/notify-place.js), одобрение/отклонение —
+-- через api/telegram-webhook.js.
+-- =========================================================
+-- ВАЖНО: сначала добавляем колонку со значением по умолчанию 'approved' —
+-- иначе все уже существующие места мгновенно исчезнут из приложения (у них
+-- не было бы статуса approved). Только после бэкфилла меняем default на
+-- 'pending' — он будет применяться уже только к новым местам.
+
+create type place_status as enum ('pending', 'approved', 'rejected');
+
+alter table public.places add column status place_status not null default 'approved';
+alter table public.places alter column status set default 'pending';
+
+create index places_status_idx on public.places (status);
+
+-- видно всем — только approved; свои места (включая ещё не одобренные и
+-- отклонённые) видит и сам создатель — как у reviews_select_approved_or_own.
+drop policy if exists "places_select_all" on public.places;
+create policy "places_select_approved_or_own" on public.places
+  for select using (status = 'approved' or auth.uid() = created_by);

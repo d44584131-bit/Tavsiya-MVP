@@ -9,6 +9,7 @@ class PlaceCardData {
   final double rating;
   final int reviewsCount;
   final String district;
+  final String? status; // 'pending' | 'rejected' | null (= approved)
 
   const PlaceCardData({
     required this.id,
@@ -17,6 +18,7 @@ class PlaceCardData {
     required this.rating,
     required this.reviewsCount,
     required this.district,
+    this.status,
   });
 }
 

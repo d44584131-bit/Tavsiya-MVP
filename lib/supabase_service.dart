@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'l10n/strings.dart';
 import 'services/feedback_service.dart';
+import 'screens/business/business_dashboard_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/place/place_detail_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -134,7 +135,7 @@ class SupabaseService {
   // ------------------------------------------------------------
 
   static const _placeCardColumns =
-      'id, name, category, district, rating_avg, reviews_count';
+      'id, name, category, district, rating_avg, reviews_count, status';
 
   /// Выбранный пользователем город — фильтрует "Сейчас популярно" и поиск.
   /// Загружается из SharedPreferences при старте (см. main.dart) и меняется
@@ -148,6 +149,7 @@ class SupabaseService {
         .from('places')
         .select(_placeCardColumns)
         .eq('city', cityKey)
+        .eq('status', 'approved')
         .order('rating_avg', ascending: false)
         .range(offset, offset + limit - 1);
 
@@ -162,8 +164,11 @@ class SupabaseService {
     int limit = 20,
     int offset = 0,
   }) async {
-    var builder =
-        _client.from('places').select(_placeCardColumns).eq('city', cityKey);
+    var builder = _client
+        .from('places')
+        .select(_placeCardColumns)
+        .eq('city', cityKey)
+        .eq('status', 'approved');
     if (query.trim().isNotEmpty) {
       builder = builder.ilike('name', '%${query.trim()}%');
     }
@@ -176,7 +181,10 @@ class SupabaseService {
     return (rows as List).map((r) => _placeFromRow(r)).toList();
   }
 
-  /// Создание нового места пользователем (шаг "Добавить «...»" в форме отзыва).
+  /// Создание нового места пользователем (шаг "Добавить «...»" в форме
+  /// отзыва) — как и полное создание владельцем (createOwnedPlace), новое
+  /// место сразу уходит на модерацию в Telegram (status='pending' по
+  /// умолчанию) и не видно другим, пока админ не одобрит.
   static Future<PlaceCardData> createPlace(
       {required String name, required String category}) async {
     final userId = _client.auth.currentUser?.id;
@@ -193,7 +201,162 @@ class SupabaseService {
         .select(_placeCardColumns)
         .single();
 
+    try {
+      await FeedbackService.notifyNewPlace(row['id'] as String);
+    } catch (_) {
+      // уведомление в Telegram не критично для успешного создания места
+    }
+
     return _placeFromRow(row);
+  }
+
+  // ------------------------------------------------------------
+  // Аккаунт заведения ("Войти как заведение" в профиле пользователя) —
+  // управление профилем/официальными фото своих мест, просмотр отзывов.
+  // Владение проставляется автоматически триггером на places (created_by),
+  // см. schema.sql → МИГРАЦИЯ: аккаунт заведения (place_owners).
+  // ------------------------------------------------------------
+
+  static Future<List<PlaceCardData>> fetchOwnedPlaces() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+
+    final rows = await _client
+        .from('place_owners')
+        .select('places($_placeCardColumns)')
+        .eq('user_id', userId);
+
+    return (rows as List)
+        .map((r) => r['places'] as Map<String, dynamic>?)
+        .whereType<Map<String, dynamic>>()
+        .map(_placeFromRow)
+        .toList();
+  }
+
+  /// Полная форма создания места владельцем ("Заведение" → "Добавить
+  /// заведение") — в отличие от createPlace() (быстрое добавление из формы
+  /// отзыва: только имя+категория), сразу собирает бизнес-детали.
+  static Future<PlaceCardData> createOwnedPlace({
+    required String name,
+    required String category,
+    String? description,
+    String? address,
+    String? phone,
+    String? website,
+    String? priceLevel,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+
+    final row = await _client
+        .from('places')
+        .insert({
+          'name': name,
+          'category': category,
+          'city': cityKey,
+          'description': description,
+          'address': address,
+          'phone': phone,
+          'website': website,
+          'price_level': priceLevel,
+          'created_by': userId,
+        })
+        .select(_placeCardColumns)
+        .single();
+
+    try {
+      await FeedbackService.notifyNewPlace(row['id'] as String);
+    } catch (_) {
+      // уведомление в Telegram не критично для успешного создания места
+    }
+
+    return _placeFromRow(row);
+  }
+
+  /// Редактирование данных места владельцем — доступ ограничен RLS-политикой
+  /// places_update_own (только владелец через place_owners).
+  static Future<void> updateOwnedPlace(
+    String placeId, {
+    required String name,
+    required String category,
+    String? description,
+    String? address,
+    String? phone,
+    String? website,
+    String? priceLevel,
+  }) async {
+    await _client.from('places').update({
+      'name': name,
+      'category': category,
+      'description': description,
+      'address': address,
+      'phone': phone,
+      'website': website,
+      'price_level': priceLevel,
+    }).eq('id', placeId);
+  }
+
+  /// Официальные фото места для управления (с id — чтобы можно было
+  /// удалить), в отличие от fetchPlacePhotos() (только URL, для публичной
+  /// карусели в профиле места).
+  static Future<List<PlaceOwnerPhotoData>> fetchOwnedPlacePhotos(
+      String placeId) async {
+    final rows = await _client
+        .from('place_photos')
+        .select('id, storage_path')
+        .eq('place_id', placeId)
+        .order('created_at');
+
+    return (rows as List)
+        .map((r) => PlaceOwnerPhotoData(
+              id: r['id'] as String,
+              storagePath: r['storage_path'] as String,
+              url: _client.storage
+                  .from('place-photos')
+                  .getPublicUrl(r['storage_path'] as String),
+            ))
+        .toList();
+  }
+
+  static Future<void> addOwnedPlacePhoto(
+      String placeId, Uint8List bytes) async {
+    final path = '$placeId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    await _client.storage.from('place-photos').uploadBinary(
+          path,
+          bytes,
+          fileOptions:
+              const FileOptions(contentType: 'image/jpeg', upsert: true),
+        );
+    await _client.from('place_photos').insert({
+      'place_id': placeId,
+      'storage_path': path,
+      'uploaded_by': _client.auth.currentUser?.id,
+    });
+  }
+
+  static Future<void> deleteOwnedPlacePhoto(PlaceOwnerPhotoData photo) async {
+    await _client.from('place_photos').delete().eq('id', photo.id);
+    try {
+      await _client.storage.from('place-photos').remove([photo.storagePath]);
+    } catch (_) {
+      // строка уже удалена из БД — не блокируем UI из-за ошибки чистки файла
+    }
+  }
+
+  /// Официальные фото места для карусели в шапке профиля — отдельная
+  /// таблица/бакет от фото, которые посетители прикладывают к отзывам
+  /// (те остаются только в отзывах и во вкладке "Фото", см. review_photos).
+  static Future<List<String>> fetchPlacePhotos(String placeId) async {
+    final rows = await _client
+        .from('place_photos')
+        .select('storage_path')
+        .eq('place_id', placeId)
+        .order('created_at');
+
+    return (rows as List)
+        .map((r) => (r as Map<String, dynamic>)['storage_path'] as String)
+        .map((path) => _client.storage.from('place-photos').getPublicUrl(path))
+        .toList();
   }
 
   /// Полная карточка места (шапка + вкладка "Информация" в PlaceDetailScreen).
@@ -202,7 +365,7 @@ class SupabaseService {
         .from('places')
         .select(
           'id, name, category, description, address, district, phone, website, price_level, '
-          'is_verified, rating_avg, reviews_count',
+          'is_verified, rating_avg, reviews_count, status',
         )
         .eq('id', id)
         .single();
@@ -220,6 +383,7 @@ class SupabaseService {
       isVerified: row['is_verified'] as bool,
       rating: (row['rating_avg'] as num).toDouble(),
       reviewsCount: row['reviews_count'] as int,
+      status: row['status'] == 'approved' ? null : row['status'] as String?,
     );
   }
 
@@ -231,6 +395,7 @@ class SupabaseService {
       rating: (r['rating_avg'] as num).toDouble(),
       reviewsCount: r['reviews_count'] as int,
       district: (r['district'] as String?) ?? '',
+      status: r['status'] == 'approved' ? null : r['status'] as String?,
     );
   }
 

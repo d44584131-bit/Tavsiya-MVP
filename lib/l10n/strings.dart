@@ -285,11 +285,6 @@ class Strings {
       _t('оставить отзыв', 'sharh qoldirish');
   String get authRequiredActionSave => _t('сохранить место', 'joyni saqlash');
   String get cancelButton => _t('Отмена', 'Bekor qilish');
-  String get reviewApprovedPushTitle =>
-      _t('Ваш отзыв одобрен', 'Sharhingiz tasdiqlandi');
-  String reviewApprovedPushBody(String placeName) => _t(
-      'Отзыв на «$placeName» теперь виден всем',
-      '«$placeName» haqidagi sharhingiz endi hammaga koʻrinadi');
 
   // ---------------------------------------------------------------
   // Уведомления (notifications_screen.dart)
@@ -300,6 +295,56 @@ class Strings {
   String get noNotificationsSubtitle => _t(
       'Здесь появятся уведомления, например об одобрении отзыва',
       'Bu yerda bildirishnomalar paydo boʻladi, masalan sharh tasdiqlanganda');
+
+  // ---------------------------------------------------------------
+  // Аккаунт заведения (business_screen.dart, business_dashboard_screen.dart,
+  // business_place_form_screen.dart)
+  // ---------------------------------------------------------------
+  String get businessEntryButton =>
+      _t('Войти как заведение', 'Muassasa sifatida kirish');
+  String get businessListTitle => _t('Мои заведения', 'Mening muassasalarim');
+  String get businessEmptyTitle =>
+      _t('У вас пока нет заведений', 'Sizda hali muassasa yoʻq');
+  String get businessEmptySubtitle => _t(
+      'Добавьте своё заведение, чтобы управлять его профилем, фото и видеть отзывы',
+      'Profilini, fotolarini boshqarish va sharhlarni koʻrish uchun muassasangizni qoʻshing');
+  String get businessAddPlaceButton =>
+      _t('Добавить заведение', 'Muassasa qoʻshish');
+  String get businessAddPlaceTitle => _t('Новое заведение', 'Yangi muassasa');
+  String get businessEditPlaceTitle =>
+      _t('Информация о заведении', 'Muassasa haqida maʼlumot');
+  String get businessNameLabel => _t('Название', 'Nomi');
+  String get businessDescriptionLabel => _t('Описание', 'Tavsif');
+  String get businessAddressLabel => _t('Адрес', 'Manzil');
+  String get businessPhoneLabel => _t('Телефон', 'Telefon');
+  String get businessWebsiteLabel => _t('Сайт', 'Sayt');
+  String get saveButton => _t('Сохранить', 'Saqlash');
+  String get businessSavedSnackbar =>
+      _t('Изменения сохранены', 'Oʻzgarishlar saqlandi');
+  String get businessCreatedSnackbar =>
+      _t('Заведение добавлено', 'Muassasa qoʻshildi');
+  String get businessSaveError => _t('Не удалось сохранить. Попробуйте ещё раз',
+      'Saqlab boʻlmadi. Qayta urinib koʻring');
+  String get businessInfoTab => _t('Информация', 'Maʼlumot');
+  String get businessPhotosTab => _t('Фото', 'Fotolar');
+  String get businessReviewsTab => _t('Отзывы', 'Sharhlar');
+  String get businessNoPhotos =>
+      _t('Пока нет официальных фото', 'Hozircha rasmiy fotolar yoʻq');
+  String get businessNoPhotosSubtitle =>
+      _t('Добавьте первое фото места', 'Joyning birinchi fotosini qoʻshing');
+  String get businessPhotoAddError => _t(
+      'Не удалось загрузить фото. Попробуйте ещё раз',
+      'Fotoni yuklab boʻlmadi. Qayta urinib koʻring');
+  String get deletePhotoConfirmTitle =>
+      _t('Удалить фото?', 'Foto oʻchirilsinmi?');
+  String get deletePhotoConfirmMessage =>
+      _t('Это действие нельзя отменить', 'Bu amalni bekor qilib boʻlmaydi');
+  String get deleteButton => _t('Удалить', 'Oʻchirish');
+  String get businessPendingBanner => _t(
+      'Заведение на модерации — скоро появится в приложении',
+      'Muassasa moderatsiyada — tez orada ilovada paydo boʻladi');
+  String get businessRejectedBanner => _t('Заведение отклонено модератором',
+      'Muassasa moderator tomonidan rad etildi');
   String get usefulLabel => _t('Полезно', 'Foydali');
   String get savedLabel => _t('Сохранено', 'Saqlangan');
   String get followersLabel => _t('Подписчиков', 'Obunachilar');
