@@ -109,7 +109,25 @@ class _BusinessScreenState extends State<BusinessScreen> {
           IconButton(icon: const Icon(Icons.add_rounded), onPressed: _addPlace),
         ],
       ),
-      body: _buildBody(theme),
+      body: Column(
+        children: [
+          Expanded(child: _buildBody(theme)),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: Text(s(context).businessExitButton),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

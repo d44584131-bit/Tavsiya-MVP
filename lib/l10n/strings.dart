@@ -302,6 +302,8 @@ class Strings {
   // ---------------------------------------------------------------
   String get businessEntryButton =>
       _t('Войти как заведение', 'Muassasa sifatida kirish');
+  String get businessExitButton =>
+      _t('Выйти из режима заведения', 'Muassasa rejimidan chiqish');
   String get businessListTitle => _t('Мои заведения', 'Mening muassasalarim');
   String get businessEmptyTitle =>
       _t('У вас пока нет заведений', 'Sizda hali muassasa yoʻq');
@@ -350,9 +352,19 @@ class Strings {
   String get followersLabel => _t('Подписчиков', 'Obunachilar');
   String get expertBadge => _t('Вы эксперт', 'Siz ekspertsiz');
   String get noviceBadge => _t('Новичок', 'Yangi');
+  String get guruBadge => _t('Вы гуру', 'Siz gurusiz');
+  String toExpertLevel(int remaining) => _t(
+      'До уровня «Эксперт» — ещё $remaining отзывов',
+      '«Ekspert» darajasigacha yana $remaining ta sharh');
   String toGuruLevel(int remaining) => _t(
       'До уровня «Гуру» — ещё $remaining отзывов',
       '«Guru» darajasigacha yana $remaining ta sharh');
+  String get maxLevelReached => _t('Максимальный уровень', 'Eng yuqori daraja');
+  // Нейтральные лейблы уровня (без "Вы") — для значка автора на отзывах,
+  // где речь о другом пользователе, а не о самом себе.
+  String get levelNovice => noviceBadge;
+  String get levelExpert => _t('Эксперт', 'Ekspert');
+  String get levelGuru => _t('Гуру', 'Guru');
   String get tabMyReviews => _t('Мои отзывы', 'Mening sharhlarim');
   String get tabSaved => _t('Сохранённое', 'Saqlangan');
   String get tabSubscriptions => _t('Подписки', 'Obunalar');

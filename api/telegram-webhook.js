@@ -76,12 +76,14 @@ module.exports = async (req, res) => {
 };
 
 /// Одобрение/отклонение отзыва. При одобрении пишет автору in-app
-/// уведомление на его языке интерфейса (profiles.preferred_language).
+/// уведомление на его языке интерфейса (profiles.preferred_language), а
+/// также отдельным уведомлением — владельцу(ям) заведения ("Вам пришёл
+/// новый отзыв"), если это не он сам оставил отзыв на своё же место.
 async function moderateReview({ id, approve, botToken, serviceKey }) {
   const newStatus = approve ? 'approved' : 'rejected';
 
   const updateRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${id}&select=user_id,places(name),profiles!reviews_user_id_fkey(preferred_language)`,
+    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${id}&select=user_id,place_id,places(name),profiles!reviews_user_id_fkey(preferred_language)`,
     {
       method: 'PATCH',
       headers: {
@@ -108,9 +110,41 @@ async function moderateReview({ id, approve, botToken, serviceKey }) {
           : `Комментарий на «${placeName}» опубликован`;
       await insertNotification({ userId: updated.user_id, title, body, serviceKey });
     }
+    if (updated?.place_id) {
+      await notifyPlaceOwnersOfNewReview({
+        placeId: updated.place_id,
+        placeName: updated.places?.name ?? '',
+        reviewAuthorId: updated.user_id,
+        serviceKey,
+      });
+    }
   }
 
   return approve ? '✅ Одобрено' : '❌ Отклонено';
+}
+
+async function notifyPlaceOwnersOfNewReview({ placeId, placeName, reviewAuthorId, serviceKey }) {
+  const ownersRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/place_owners?place_id=eq.${placeId}&select=user_id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+  );
+  if (!ownersRes.ok) return;
+  const owners = await ownersRes.json();
+
+  for (const owner of owners) {
+    if (owner.user_id === reviewAuthorId) continue; // не уведомляем о своём же отзыве на своё место
+
+    const profRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${owner.user_id}&select=preferred_language`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+    );
+    const profRows = profRes.ok ? await profRes.json() : [];
+    const lang = profRows[0]?.preferred_language === 'uz' ? 'uz' : 'ru';
+    const title = lang === 'uz' ? 'Sizga yangi sharh keldi' : 'Вам пришёл новый отзыв';
+    const body =
+      lang === 'uz' ? `«${placeName}» uchun yangi sharh` : `Новый отзыв на «${placeName}»`;
+    await insertNotification({ userId: owner.user_id, title, body, serviceKey });
+  }
 }
 
 /// Одобрение/отклонение нового заведения. При одобрении место становится

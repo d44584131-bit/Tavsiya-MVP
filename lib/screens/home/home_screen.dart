@@ -234,6 +234,14 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(child: _buildTrendingRow()),
           SliverToBoxAdapter(child: _buildCategoryFilterHeader(theme)),
           if (_selectedCategory != null) _buildFilterResultsSliver(theme),
+          if (!_isLoading && _collections.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: _SectionTitle(
+                  title: s(context).collectionsTitle,
+                  onSeeAll: _openAllCollections),
+            ),
+            SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
+          ],
           if (!_isLoading && _recentReviews.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: _SectionTitle(
@@ -249,14 +257,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-          ],
-          if (!_isLoading && _collections.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: _SectionTitle(
-                  title: s(context).collectionsTitle,
-                  onSeeAll: _openAllCollections),
-            ),
-            SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
           ],
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],

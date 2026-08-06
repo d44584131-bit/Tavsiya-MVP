@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'reviewer_level_badge.dart';
 
 class ReviewListItemData {
   final String authorName;
   final String placeName;
   final int stars;
   final String text;
+  final int? authorReviewsCount;
 
   const ReviewListItemData({
     required this.authorName,
     required this.placeName,
     required this.stars,
     required this.text,
+    this.authorReviewsCount,
   });
 }
 
@@ -52,11 +55,17 @@ class ReviewListItem extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(data.authorName,
                           style: theme.textTheme.titleMedium,
                           overflow: TextOverflow.ellipsis),
                     ),
+                    if (data.authorReviewsCount != null) ...[
+                      const SizedBox(width: 6),
+                      ReviewerLevelBadge(
+                          reviewsCount: data.authorReviewsCount!),
+                    ],
+                    const Spacer(),
                     ...List.generate(
                       5,
                       (i) => Icon(

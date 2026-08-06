@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthState;
 import '../../l10n/strings.dart';
+import '../../services/reviewer_level.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/status_badge.dart';
@@ -302,15 +303,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
               if (profile.reviewsCount > 0) ...[
                 const SizedBox(height: 16),
-                StatusBadge(
-                  statusLabel: profile.reviewsCount >= 10
-                      ? s(context).expertBadge
-                      : s(context).noviceBadge,
-                  currentPoints: profile.reviewsCount,
-                  nextLevelPoints: 50,
-                  nextLevelLabel: s(context)
-                      .toGuruLevel((50 - profile.reviewsCount).clamp(0, 50)),
-                ),
+                _buildStatusBadge(profile),
               ],
               const SizedBox(height: 8),
             ],
@@ -346,6 +339,31 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ],
     );
+  }
+
+  /// Новичок (0–9 отзывов) → Эксперт (10–49) → Гуру (50+, максимум).
+  Widget _buildStatusBadge(MyProfileData profile) {
+    final count = profile.reviewsCount;
+    return switch (reviewerLevelFor(count)) {
+      ReviewerLevel.novice => StatusBadge(
+          statusLabel: s(context).noviceBadge,
+          currentPoints: count,
+          nextLevelPoints: 10,
+          nextLevelLabel: s(context).toExpertLevel(10 - count),
+        ),
+      ReviewerLevel.expert => StatusBadge(
+          statusLabel: s(context).expertBadge,
+          currentPoints: count,
+          nextLevelPoints: 50,
+          nextLevelLabel: s(context).toGuruLevel(50 - count),
+        ),
+      ReviewerLevel.guru => StatusBadge(
+          statusLabel: s(context).guruBadge,
+          currentPoints: count,
+          nextLevelPoints: count,
+          nextLevelLabel: s(context).maxLevelReached,
+        ),
+    };
   }
 
   Widget _buildMyReviewsTab(ThemeData theme) {

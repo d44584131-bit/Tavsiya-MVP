@@ -434,7 +434,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, pros, cons, price_level, status, created_at, profiles!reviews_user_id_fkey(display_name), review_photos(storage_path)')
+            'rating, text, pros, cons, price_level, status, created_at, profiles!reviews_user_id_fkey(display_name, reviews_count), review_photos(storage_path)')
         .eq('place_id', placeId)
         .order('created_at', ascending: false)
         .limit(limit);
@@ -453,6 +453,7 @@ class SupabaseService {
         photoUrls: _photoUrlsFromRow(r),
         moderationStatus:
             r['status'] == 'approved' ? null : r['status'] as String?,
+        authorReviewsCount: profile?['reviews_count'] as int?,
       );
     }).toList();
   }
@@ -472,7 +473,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, profiles!reviews_user_id_fkey(display_name), places(name)')
+            'rating, text, profiles!reviews_user_id_fkey(display_name, reviews_count), places(name)')
         .eq('status', 'approved')
         .order('created_at', ascending: false)
         .limit(limit);
@@ -486,6 +487,7 @@ class SupabaseService {
         placeName: (place?['name'] as String?) ?? '',
         stars: r['rating'] as int,
         text: r['text'] as String,
+        authorReviewsCount: profile?['reviews_count'] as int?,
       );
     }).toList();
   }

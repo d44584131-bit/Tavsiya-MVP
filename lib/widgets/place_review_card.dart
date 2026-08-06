@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
+import 'reviewer_level_badge.dart';
 
 class PlaceReviewData {
   final String authorName;
@@ -12,6 +13,8 @@ class PlaceReviewData {
   final String? priceLevel; // 'budget' | 'mid' | 'mid_high' | 'high'
   final DateTime? createdAt;
   final String? moderationStatus; // 'pending' | 'rejected' | null (= approved)
+  final int?
+      authorReviewsCount; // null там, где автор — не другой пользователь (напр. "Мои отзывы")
 
   const PlaceReviewData({
     required this.authorName,
@@ -23,6 +26,7 @@ class PlaceReviewData {
     this.priceLevel,
     this.createdAt,
     this.moderationStatus,
+    this.authorReviewsCount,
   });
 }
 
@@ -67,7 +71,20 @@ class PlaceReviewCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(data.authorName, style: theme.textTheme.titleMedium),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(data.authorName,
+                              style: theme.textTheme.titleMedium,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        if (data.authorReviewsCount != null) ...[
+                          const SizedBox(width: 6),
+                          ReviewerLevelBadge(
+                              reviewsCount: data.authorReviewsCount!),
+                        ],
+                      ],
+                    ),
                     Row(
                       children: [
                         ...List.generate(
