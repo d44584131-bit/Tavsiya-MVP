@@ -8,6 +8,7 @@ import '../../widgets/review_list_item.dart';
 import '../place/collections_list_screen.dart';
 import '../place/place_list_screen.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
+import '../reviews/all_reviews_screen.dart';
 
 class _CategoryItem {
   final String key;
@@ -87,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final results = await Future.wait([
         SupabaseService.fetchTrendingPlaces(limit: _trendingPageSize),
         SupabaseService.fetchRecentReviews(language: widget.language),
-        SupabaseService.fetchCollections(),
+        SupabaseService.fetchCollections(language: widget.language),
       ]);
       if (!mounted) return;
       final trending = results[0] as List<PlaceCardData>;
@@ -163,6 +164,12 @@ class _HomeScreenState extends State<HomeScreen> {
             SupabaseService.fetchTrendingPlaces(offset: offset, limit: limit),
         onPlaceTap: (p) => widget.onPlaceTap?.call(p),
       ),
+    ));
+  }
+
+  void _openAllReviews() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AllReviewsScreen(language: widget.language),
     ));
   }
 
@@ -245,7 +252,8 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!_isLoading && _recentReviews.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: _SectionTitle(
-                  title: s(context).recentReviewsTitle, onSeeAll: () {}),
+                  title: s(context).recentReviewsTitle,
+                  onSeeAll: _openAllReviews),
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),

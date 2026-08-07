@@ -29,7 +29,7 @@ class PlaceListTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 100,
+          height: 118,
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -42,7 +42,7 @@ class PlaceListTile extends StatelessWidget {
                 borderRadius:
                     const BorderRadius.horizontal(left: Radius.circular(16)),
                 child: Container(
-                  width: 100,
+                  width: 118,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
@@ -52,31 +52,31 @@ class PlaceListTile extends StatelessWidget {
                     ),
                   ),
                   child: Icon(_categoryIcon(data.category),
-                      color: Colors.white.withValues(alpha: 0.9), size: 32),
+                      color: Colors.white.withValues(alpha: 0.9), size: 36),
                 ),
               ),
               Expanded(
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(data.name,
-                          style: theme.textTheme.titleMedium,
+                          style: theme.textTheme.titleLarge,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       Text(data.district,
-                          style: theme.textTheme.labelSmall,
+                          style: theme.textTheme.bodyMedium,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           const Icon(Icons.star_rounded,
-                              size: 15, color: AppColors.accentOrange),
+                              size: 17, color: AppColors.accentOrange),
                           const SizedBox(width: 3),
                           Text(data.rating.toStringAsFixed(1),
                               style: theme.textTheme.labelSmall),

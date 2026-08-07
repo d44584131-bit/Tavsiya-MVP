@@ -629,3 +629,12 @@ create index places_status_idx on public.places (status);
 drop policy if exists "places_select_all" on public.places;
 create policy "places_select_approved_or_own" on public.places
   for select using (status = 'approved' or auth.uid() = created_by);
+
+-- =========================================================
+-- МИГРАЦИЯ: узбекское название подборки ("Подборки для вас" на главном
+-- экране раньше показывали только русский заголовок независимо от языка
+-- интерфейса — title_uz заполняется вручную через дашборд, при отсутствии
+-- используется русский как раньше).
+-- =========================================================
+
+alter table public.collections add column title_uz text;

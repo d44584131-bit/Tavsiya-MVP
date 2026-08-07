@@ -52,6 +52,7 @@ class PlaceReviewCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
                 radius: 18,
@@ -67,6 +68,9 @@ class PlaceReviewCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
+              // Expanded — чтобы имя всегда занимало ровно место до звёзд,
+              // а не только свою фактическую ширину (иначе звёзды сдвигались
+              // бы в зависимости от длины имени).
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,56 +89,67 @@ class PlaceReviewCard extends StatelessWidget {
                         ],
                       ],
                     ),
-                    Row(
-                      children: [
-                        ...List.generate(
-                          5,
-                          (i) => Icon(
-                            Icons.star_rounded,
-                            size: 13,
-                            color: i < data.stars
-                                ? AppColors.accentOrange
-                                : theme.dividerColor,
-                          ),
-                        ),
-                        if (data.createdAt != null) ...[
-                          const SizedBox(width: 6),
-                          Text(_formatDate(data.createdAt!),
-                              style: theme.textTheme.labelSmall),
-                        ],
-                      ],
-                    ),
+                    if (data.createdAt != null) ...[
+                      const SizedBox(height: 2),
+                      Text(_formatDate(data.createdAt!),
+                          style: theme.textTheme.labelSmall),
+                    ],
                   ],
                 ),
               ),
-              if (data.moderationStatus == 'pending')
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentOrange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+              const SizedBox(width: 8),
+              // Звёзды закреплены на правой стороне карточки, отдельной
+              // колонкой — не "плавают" вслед за именем автора.
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      5,
+                      (i) => Icon(
+                        Icons.star_rounded,
+                        size: 13,
+                        color: i < data.stars
+                            ? AppColors.accentOrange
+                            : theme.dividerColor,
+                      ),
+                    ),
                   ),
-                  child: Text(s(context).pendingBadge,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.accentOrange,
-                          fontWeight: FontWeight.w600)),
-                ),
-              if (data.moderationStatus == 'rejected')
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.negative.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(s(context).rejectedBadge,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.negative,
-                          fontWeight: FontWeight.w600)),
-                ),
+                  if (data.moderationStatus == 'pending') ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentOrange.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(s(context).pendingBadge,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.accentOrange,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                  if (data.moderationStatus == 'rejected') ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.negative.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(s(context).rejectedBadge,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.negative,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 10),

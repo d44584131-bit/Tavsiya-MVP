@@ -55,25 +55,37 @@ class ReviewListItem extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Flexible(
-                      child: Text(data.authorName,
-                          style: theme.textTheme.titleMedium,
-                          overflow: TextOverflow.ellipsis),
+                    // Expanded (не Flexible) — иначе при коротком имени
+                    // звёзды "плавали" бы левее правого края, съедая только
+                    // фактическую ширину текста, а не всё доступное место.
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(data.authorName,
+                                style: theme.textTheme.titleMedium,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          if (data.authorReviewsCount != null) ...[
+                            const SizedBox(width: 6),
+                            ReviewerLevelBadge(
+                                reviewsCount: data.authorReviewsCount!),
+                          ],
+                        ],
+                      ),
                     ),
-                    if (data.authorReviewsCount != null) ...[
-                      const SizedBox(width: 6),
-                      ReviewerLevelBadge(
-                          reviewsCount: data.authorReviewsCount!),
-                    ],
-                    const Spacer(),
-                    ...List.generate(
-                      5,
-                      (i) => Icon(
-                        Icons.star_rounded,
-                        size: 13,
-                        color: i < data.stars
-                            ? AppColors.accentOrange
-                            : theme.dividerColor,
+                    const SizedBox(width: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        5,
+                        (i) => Icon(
+                          Icons.star_rounded,
+                          size: 13,
+                          color: i < data.stars
+                              ? AppColors.accentOrange
+                              : theme.dividerColor,
+                        ),
                       ),
                     ),
                   ],

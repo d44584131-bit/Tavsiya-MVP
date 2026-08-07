@@ -400,11 +400,13 @@ class SupabaseService {
   }
 
   /// "Подборки для вас" на главном экране — курируемые списки мест.
-  static Future<List<CollectionData>> fetchCollections() async {
+  /// title_uz заполняется вручную через дашборд; при отсутствии — русский.
+  static Future<List<CollectionData>> fetchCollections(
+      {required AppLanguage language}) async {
     final rows = await _client
         .from('collections')
         .select(
-            'id, title, collection_places(sort_order, places($_placeCardColumns))')
+            'id, title, title_uz, collection_places(sort_order, places($_placeCardColumns))')
         .order('sort_order');
 
     return (rows as List).map((r) {
@@ -416,8 +418,13 @@ class SupabaseService {
           .whereType<Map<String, dynamic>>()
           .map(_placeFromRow)
           .toList();
+      final titleUz = r['title_uz'] as String?;
+      final title =
+          language == AppLanguage.uz && titleUz != null && titleUz.isNotEmpty
+              ? titleUz
+              : r['title'] as String;
       return CollectionData(
-          id: r['id'] as String, title: r['title'] as String, places: places);
+          id: r['id'] as String, title: title, places: places);
     }).toList();
   }
 
@@ -467,16 +474,17 @@ class SupabaseService {
         .toList();
   }
 
-  /// "Новые отзывы" на главном экране — последние approved-отзывы по всем местам.
+  /// "Новые отзывы" на главном экране (и полный список с пагинацией на
+  /// отдельной странице) — последние approved-отзывы по всем местам.
   static Future<List<ReviewListItemData>> fetchRecentReviews(
-      {required AppLanguage language, int limit = 10}) async {
+      {required AppLanguage language, int limit = 10, int offset = 0}) async {
     final rows = await _client
         .from('reviews')
         .select(
             'rating, text, profiles!reviews_user_id_fkey(display_name, reviews_count), places(name)')
         .eq('status', 'approved')
         .order('created_at', ascending: false)
-        .limit(limit);
+        .range(offset, offset + limit - 1);
 
     return (rows as List).map((r) {
       final profile = r['profiles'] as Map<String, dynamic>?;

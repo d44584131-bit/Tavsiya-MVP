@@ -29,14 +29,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
     try {
       final items = await SupabaseService.fetchNotifications();
-      // Помечаем всё прочитанным при открытии экрана — бейдж на профиле
-      // сбросится сразу, до того как пользователь дочитает список.
-      await SupabaseService.markAllNotificationsRead();
       if (!mounted) return;
       setState(() {
         _items = items;
         _isLoading = false;
       });
+      // Помечаем прочитанным отдельно и без блокировки экрана — бейдж на
+      // профиле сбросится, как только получится, но сбой этого побочного
+      // запроса не должен превращать уже загруженный список в экран ошибки.
+      SupabaseService.markAllNotificationsRead().catchError((_) {});
     } catch (_) {
       if (!mounted) return;
       setState(() {
