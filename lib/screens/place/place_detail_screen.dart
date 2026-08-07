@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
+import '../../services/share_service.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/stat_tile.dart';
@@ -201,6 +202,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
             leading: _CircleIconButton(
                 icon: Icons.arrow_back_rounded,
                 onTap: () => Navigator.maybePop(context)),
+            actions: [
+              _CircleIconButton(
+                  icon: Icons.share_rounded, onTap: () => _sharePlace(place)),
+              const SizedBox(width: 8),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -534,6 +540,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         ),
       ),
     );
+  }
+
+  void _sharePlace(PlaceDetailData place) {
+    ShareService.sharePlace(
+        placeId: place.id, placeName: place.name, language: widget.language);
   }
 
   void _openPhotoViewer(int index) {
