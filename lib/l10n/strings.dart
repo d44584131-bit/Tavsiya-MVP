@@ -147,6 +147,9 @@ class Strings {
   String get verifiedBadge => _t('Подтверждено', 'Tasdiqlangan');
   String get callAction => _t('Позвонить', 'Qoʻngʻiroq');
   String get routeAction => _t('Маршрут', 'Yoʻnalish');
+  String get routeGoogleMaps => _t('Google Maps', 'Google Maps');
+  String get routeYandexMaps => _t('Яндекс Карты', 'Yandex Xaritalar');
+  String get routeAppleMaps => _t('Apple Карты', 'Apple xaritalari');
   String get websiteAction => _t('Сайт', 'Sayt');
   String get instagramAction => _t('Instagram', 'Instagram');
   String get saveAction => _t('Сохранить', 'Saqlash');

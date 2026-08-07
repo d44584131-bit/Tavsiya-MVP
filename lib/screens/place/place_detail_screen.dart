@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/strings.dart';
@@ -604,8 +605,44 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
     }
     final query =
         Uri.encodeComponent('$address, ${place.district}, ${s(context).cityName}');
-    await _launch(
-        Uri.parse('https://www.google.com/maps/search/?api=1&query=$query'));
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    final selected = await showModalBottomSheet<Uri>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.map_rounded),
+              title: Text(s(context).routeGoogleMaps),
+              onTap: () => Navigator.pop(
+                context,
+                Uri.parse(
+                    'https://www.google.com/maps/search/?api=1&query=$query'),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.map_rounded),
+              title: Text(s(context).routeYandexMaps),
+              onTap: () => Navigator.pop(
+                context,
+                Uri.parse('https://yandex.ru/maps/?text=$query'),
+              ),
+            ),
+            if (isIOS)
+              ListTile(
+                leading: const Icon(Icons.map_rounded),
+                title: Text(s(context).routeAppleMaps),
+                onTap: () => Navigator.pop(
+                  context,
+                  Uri.parse('https://maps.apple.com/?q=$query'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    await _launch(selected);
   }
 
   void _openPhotoViewer(int index) {
