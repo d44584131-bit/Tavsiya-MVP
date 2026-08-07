@@ -12,7 +12,6 @@ import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
 import '../../widgets/place_review_card.dart';
 import '../auth/auth_screen.dart';
-import '../business/business_screen.dart';
 import '../feedback/feedback_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../review_form/review_form_screen.dart' show ReviewDraftData;
@@ -47,6 +46,7 @@ class ProfileScreen extends StatefulWidget {
   final bool isActive;
   final void Function(PlaceCardData place)? onPlaceTap;
   final void Function(ReviewDraftData draft)? onOpenDraft;
+  final VoidCallback onOpenBusiness;
 
   const ProfileScreen({
     super.key,
@@ -57,6 +57,7 @@ class ProfileScreen extends StatefulWidget {
     this.isActive = true,
     this.onPlaceTap,
     this.onOpenDraft,
+    required this.onOpenBusiness,
   });
 
   @override
@@ -181,8 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         },
         onBusiness: () {
           Navigator.of(context).pop();
-          Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => BusinessScreen(language: widget.language)));
+          widget.onOpenBusiness();
         },
       ),
     );

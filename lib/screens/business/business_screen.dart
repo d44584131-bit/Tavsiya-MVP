@@ -96,6 +96,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text(s(context).businessListTitle),
         actions: [
           IconButton(
@@ -119,7 +120,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () =>
+                      Navigator.of(context).popUntil((route) => route.isFirst),
                   icon: const Icon(Icons.logout_rounded),
                   label: Text(s(context).businessExitButton),
                 ),

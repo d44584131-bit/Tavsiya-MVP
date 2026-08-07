@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/permission_service.dart';
 import '../../widgets/bottom_nav_bar.dart';
 import '../../widgets/place_card.dart';
+import '../business/business_screen.dart';
 import '../home/home_screen.dart';
 import '../search/search_screen.dart';
 import '../profile/profile_screen.dart';
@@ -42,6 +43,7 @@ class _AppShellState extends State<AppShell> {
   final _navigatorKey = GlobalKey<NavigatorState>();
   int _navIndex = 0;
   bool _reviewFormActive = false;
+  bool _businessModeActive = false;
 
   @override
   void initState() {
@@ -92,6 +94,21 @@ class _AppShellState extends State<AppShell> {
     if (mounted) setState(() => _reviewFormActive = false);
   }
 
+  /// Режим заведения открывается поверх той же вложенной навигации, что и
+  /// остальные экраны (карточка места, форма отзыва) — поэтому нижнее меню
+  /// (bottomNavigationBar Scaffold'а) скрывается на всё время, пока
+  /// пользователь внутри (BusinessScreen и всё, что он откроет поверх себя),
+  /// а не просто на один пуш.
+  Future<void> _openBusiness() async {
+    setState(() => _businessModeActive = true);
+    await _navigatorKey.currentState!.push(
+      MaterialPageRoute(
+        builder: (_) => BusinessScreen(language: widget.language),
+      ),
+    );
+    if (mounted) setState(() => _businessModeActive = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final tabs = [
@@ -111,6 +128,7 @@ class _AppShellState extends State<AppShell> {
         isActive: _navIndex == 2,
         onPlaceTap: _openPlace,
         onOpenDraft: (d) => _openReviewForm(draft: d),
+        onOpenBusiness: _openBusiness,
       ),
     ];
 
@@ -125,12 +143,14 @@ class _AppShellState extends State<AppShell> {
           builder: (_) => IndexedStack(index: _navIndex, children: tabs),
         ),
       ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: _navIndex,
-        reviewActive: _reviewFormActive,
-        onTabSelected: _onTabSelected,
-        onAddReview: () => _openReviewForm(),
-      ),
+      bottomNavigationBar: _businessModeActive
+          ? null
+          : BottomNavBar(
+              currentIndex: _navIndex,
+              reviewActive: _reviewFormActive,
+              onTabSelected: _onTabSelected,
+              onAddReview: () => _openReviewForm(),
+            ),
     );
   }
 }
