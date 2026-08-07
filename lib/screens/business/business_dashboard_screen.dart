@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/strings.dart';
+import '../../services/permission_service.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/empty_state.dart';
@@ -45,6 +46,7 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
   bool _isLoadingPhotos = true;
   List<PlaceOwnerPhotoData> _photos = const [];
   bool _isUploadingPhoto = false;
+  final Set<String> _deletingPhotoIds = {};
 
   bool _isLoadingReviews = true;
   List<PlaceReviewData> _reviews = const [];
@@ -137,7 +139,9 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
         ),
       ),
     );
-    if (source == null) return;
+    if (source == null || !mounted) return;
+    if (!await PermissionService.ensurePhotoAccess(context, source)) return;
+    if (!mounted) return;
     final file = await _picker.pickImage(
         source: source, maxWidth: 1600, imageQuality: 85);
     if (file == null) return;
@@ -176,11 +180,16 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
       ),
     );
     if (confirmed != true) return;
-    setState(() => _photos = _photos.where((p) => p.id != photo.id).toList());
+    setState(() => _deletingPhotoIds.add(photo.id));
     try {
       await SupabaseService.deleteOwnedPlacePhoto(photo);
+      if (!mounted) return;
+      setState(() {
+        _photos = _photos.where((p) => p.id != photo.id).toList();
+        _deletingPhotoIds.remove(photo.id);
+      });
     } catch (_) {
-      if (mounted) _loadPhotos();
+      if (mounted) setState(() => _deletingPhotoIds.remove(photo.id));
     }
   }
 
@@ -323,6 +332,7 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
                 itemCount: _photos.length,
                 itemBuilder: (context, i) {
                   final photo = _photos[i];
+                  final isDeleting = _deletingPhotoIds.contains(photo.id);
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -339,11 +349,29 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
                           ),
                         ),
                       ),
+                      if (isDeleting)
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              color: Colors.black45,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         top: -6,
                         right: -6,
                         child: InkWell(
-                          onTap: () => _deletePhoto(photo),
+                          onTap:
+                              isDeleting ? null : () => _deletePhoto(photo),
                           child: Container(
                             width: 24,
                             height: 24,

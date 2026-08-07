@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
+import 'photo_viewer_screen.dart';
 import 'reviewer_level_badge.dart';
 
 class PlaceReviewData {
@@ -198,26 +199,35 @@ class PlaceReviewCard extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 itemCount: data.photoUrls.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => ClipRRect(
+                itemBuilder: (context, i) => InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    data.photoUrls[i],
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, progress) =>
-                        progress == null
-                            ? child
-                            : Container(
-                                width: 64,
-                                height: 64,
-                                color: theme.dividerColor),
-                    errorBuilder: (context, error, stack) => Container(
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => PhotoViewerScreen(
+                        photos: data.photoUrls, initialIndex: i),
+                  )),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      data.photoUrls[i],
                       width: 64,
                       height: 64,
-                      color: theme.dividerColor,
-                      child: Icon(Icons.broken_image_rounded,
-                          color: theme.textTheme.bodyMedium?.color, size: 20),
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, progress) =>
+                          progress == null
+                              ? child
+                              : Container(
+                                  width: 64,
+                                  height: 64,
+                                  color: theme.dividerColor),
+                      errorBuilder: (context, error, stack) => Container(
+                        width: 64,
+                        height: 64,
+                        color: theme.dividerColor,
+                        child: Icon(Icons.broken_image_rounded,
+                            color: theme.textTheme.bodyMedium?.color,
+                            size: 20),
+                      ),
                     ),
                   ),
                 ),

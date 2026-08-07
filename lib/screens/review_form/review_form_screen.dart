@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import '../../l10n/strings.dart';
+import '../../services/permission_service.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/place_card.dart';
@@ -78,6 +79,8 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   String? _submitError;
   String?
       _draftId; // если продолжаем черновик — обновляем его вместо создания нового
+  bool _reviewPublished = false; // возвращаем true при pop, чтобы вызывающий
+  // экран знал, что нужно перезагрузить списки (например, "Мои отзывы" в профиле)
 
   Timer? _searchDebounce;
   bool _isSearchingPlaces = false;
@@ -233,7 +236,9 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         ),
       ),
     );
-    if (source == null) return;
+    if (source == null || !mounted) return;
+    if (!await PermissionService.ensurePhotoAccess(context, source)) return;
+    if (!mounted) return;
     final file = await _picker.pickImage(
         source: source, maxWidth: 1600, imageQuality: 85);
     if (file == null) return;
@@ -284,7 +289,10 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         }
       }
       if (!mounted) return;
-      setState(() => _isSubmitting = false);
+      setState(() {
+        _isSubmitting = false;
+        _reviewPublished = true;
+      });
       _goTo(3);
     } catch (e) {
       if (!mounted) return;
@@ -310,7 +318,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         final navigator = Navigator.of(context);
         await _maybeSaveDraft();
         if (!mounted) return;
-        navigator.pop();
+        navigator.pop(_reviewPublished);
       },
       child: Scaffold(
         appBar: AppBar(

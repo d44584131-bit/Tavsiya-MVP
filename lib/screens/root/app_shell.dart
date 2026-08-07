@@ -44,11 +44,21 @@ class _AppShellState extends State<AppShell> {
   int _navIndex = 0;
   bool _reviewFormActive = false;
   bool _businessModeActive = false;
+  // Растёт при каждом успешно опубликованном отзыве — ProfileScreen слушает
+  // и перезагружает "Мои отзывы" даже если вкладка профиля не переключалась
+  // (например, отзыв был опубликован прямо из профиля).
+  final _reviewsChanged = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
     _maybeRequestPermissions();
+  }
+
+  @override
+  void dispose() {
+    _reviewsChanged.dispose();
+    super.dispose();
   }
 
   Future<void> _maybeRequestPermissions() async {
@@ -83,7 +93,7 @@ class _AppShellState extends State<AppShell> {
   Future<void> _openReviewForm(
       {PlaceCardData? place, ReviewDraftData? draft}) async {
     setState(() => _reviewFormActive = true);
-    await _navigatorKey.currentState!.push(
+    final published = await _navigatorKey.currentState!.push<bool>(
       MaterialPageRoute(
         builder: (_) => ReviewFormScreen(
             preselectedPlace: place,
@@ -92,6 +102,7 @@ class _AppShellState extends State<AppShell> {
       ),
     );
     if (mounted) setState(() => _reviewFormActive = false);
+    if (published == true) _reviewsChanged.value++;
   }
 
   /// Режим заведения открывается поверх той же вложенной навигации, что и
@@ -129,6 +140,7 @@ class _AppShellState extends State<AppShell> {
         onPlaceTap: _openPlace,
         onOpenDraft: (d) => _openReviewForm(draft: d),
         onOpenBusiness: _openBusiness,
+        reviewsChanged: _reviewsChanged,
       ),
     ];
 

@@ -113,17 +113,25 @@ class _BusinessScreenState extends State<BusinessScreen> {
       body: Column(
         children: [
           Expanded(child: _buildBody(theme)),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () =>
-                      Navigator.of(context).popUntil((route) => route.isFirst),
-                  icon: const Icon(Icons.logout_rounded),
-                  label: Text(s(context).businessExitButton),
+          // Тот же приём, что и в обычном нижнем меню (BottomNavBar): фон
+          // заливает весь безопасный отступ снизу (жестовая панель Android),
+          // а сама кнопка держится в SafeArea над системными кнопками —
+          // иначе на телефонах с жестовой навигацией кнопка "Выйти" оказывалась
+          // под системной панелью.
+          Container(
+            color: theme.cardColor,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context)
+                        .popUntil((route) => route.isFirst),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: Text(s(context).businessExitButton),
+                  ),
                 ),
               ),
             ),

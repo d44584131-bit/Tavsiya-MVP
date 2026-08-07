@@ -228,6 +228,16 @@ class Strings {
   String get choosePhotoGallery =>
       _t('Выбрать из галереи', 'Galereyadan tanlash');
   String get choosePhotoCamera => _t('Сделать фото', 'Suratga olish');
+  String get permissionDeniedTitle =>
+      _t('Нет доступа', 'Ruxsat berilmagan');
+  String get permissionDeniedCameraMessage => _t(
+      'Разрешите доступ к камере в настройках телефона, чтобы сделать фото.',
+      'Surat olish uchun telefon sozlamalarida kameraga ruxsat bering.');
+  String get permissionDeniedGalleryMessage => _t(
+      'Разрешите доступ к галерее в настройках телефона, чтобы выбрать фото.',
+      'Galereyadan foto tanlash uchun telefon sozlamalarida ruxsatni yoqing.');
+  String get openSettingsButton =>
+      _t('Открыть настройки', 'Sozlamalarni ochish');
   String get prosQuestion => _t('Что понравилось?', 'Nima yoqdi?');
   String get prosHint => _t(
       'Например: вкусно, быстро, приветливо', 'Masalan: mazali, tez, doʻstona');
@@ -319,6 +329,8 @@ class Strings {
   String get businessDescriptionLabel => _t('Описание', 'Tavsif');
   String get businessAddressLabel => _t('Адрес', 'Manzil');
   String get businessPhoneLabel => _t('Телефон', 'Telefon');
+  String get addPhoneNumberButton =>
+      _t('Добавить номер', 'Raqam qoʻshish');
   String get businessWebsiteLabel => _t('Сайт', 'Sayt');
   String get saveButton => _t('Сохранить', 'Saqlash');
   String get businessSavedSnackbar =>

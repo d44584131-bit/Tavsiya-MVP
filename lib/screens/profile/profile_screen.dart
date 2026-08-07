@@ -47,6 +47,7 @@ class ProfileScreen extends StatefulWidget {
   final void Function(PlaceCardData place)? onPlaceTap;
   final void Function(ReviewDraftData draft)? onOpenDraft;
   final VoidCallback onOpenBusiness;
+  final Listenable? reviewsChanged;
 
   const ProfileScreen({
     super.key,
@@ -58,6 +59,7 @@ class ProfileScreen extends StatefulWidget {
     this.onPlaceTap,
     this.onOpenDraft,
     required this.onOpenBusiness,
+    this.reviewsChanged,
   });
 
   @override
@@ -71,6 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   late final StreamSubscription<AuthState> _authSub;
 
   bool _isLoading = true;
+  bool _isSigningOut = false;
   bool _hasError = false;
   MyProfileData? _profile;
   List<PlaceReviewData> _myReviews = const [];
@@ -84,10 +87,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     _load();
     _authSub = SupabaseService.authStateChanges.listen((_) => _load());
+    widget.reviewsChanged?.addListener(_load);
   }
 
   @override
   void dispose() {
+    widget.reviewsChanged?.removeListener(_load);
     _authSub.cancel();
     _tabController.dispose();
     super.dispose();
@@ -157,7 +162,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _signOut() async {
-    await SupabaseService.signOut();
+    setState(() => _isSigningOut = true);
+    try {
+      await SupabaseService.signOut();
+    } finally {
+      if (mounted) setState(() => _isSigningOut = false);
+    }
   }
 
   void _openSettings() {
@@ -222,6 +232,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildBody(ThemeData theme) {
+    if (_isSigningOut) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (SupabaseService.currentUser == null) {
       return EmptyState(
         icon: Icons.person_outline_rounded,

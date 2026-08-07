@@ -5,6 +5,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/stat_tile.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_review_card.dart';
+import '../../widgets/photo_viewer_screen.dart';
 import '../../widgets/auth_required_dialog.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
 
@@ -395,6 +396,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
               _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
           label: s(context).saveAction,
           active: _isSaved,
+          loading: _isTogglingSave,
           onTap: _isTogglingSave ? null : _toggleSaved,
         ),
       ],
@@ -538,7 +540,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
     Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) =>
-          _PhotoViewerScreen(photos: _allPhotos, initialIndex: index),
+          PhotoViewerScreen(photos: _allPhotos, initialIndex: index),
     ));
   }
 
@@ -592,12 +594,14 @@ class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
+  final bool loading;
   final VoidCallback? onTap;
   const _QuickAction(
       {required this.icon,
       required this.label,
       required this.onTap,
-      this.active = false});
+      this.active = false,
+      this.loading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -622,7 +626,14 @@ class _QuickAction extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: theme.dividerColor),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: loading
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: color),
+                      )
+                    : Icon(icon, color: color, size: 20),
               ),
               const SizedBox(height: 6),
               Text(label, style: theme.textTheme.labelSmall),
@@ -659,72 +670,6 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
-/// Полноэкранный просмотр фото места (открывается из вкладки "Фото") —
-/// свайп между фото + пинч-зум на каждом.
-class _PhotoViewerScreen extends StatefulWidget {
-  final List<String> photos;
-  final int initialIndex;
-  const _PhotoViewerScreen({required this.photos, required this.initialIndex});
-
-  @override
-  State<_PhotoViewerScreen> createState() => _PhotoViewerScreenState();
-}
-
-class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
-  late final _controller = PageController(initialPage: widget.initialIndex);
-  late int _index = widget.initialIndex;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          PageView.builder(
-            controller: _controller,
-            onPageChanged: (i) => setState(() => _index = i),
-            itemCount: widget.photos.length,
-            itemBuilder: (context, i) => InteractiveViewer(
-              child: Center(
-                  child: Image.network(widget.photos[i], fit: BoxFit.contain)),
-            ),
-          ),
-          Positioned(
-            top: 8,
-            left: 8,
-            child: SafeArea(
-              child: IconButton(
-                onPressed: () => Navigator.maybePop(context),
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
-              ),
-            ),
-          ),
-          if (widget.photos.length > 1)
-            Positioned(
-              bottom: 24,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                child: Center(
-                  child: Text(
-                    '${_index + 1} / ${widget.photos.length}',
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Табы с плавным анимированным underline (встроено в TabBar через indicator).
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {

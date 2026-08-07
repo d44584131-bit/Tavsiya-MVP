@@ -3,6 +3,7 @@ import 'dart:typed_data' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/strings.dart';
+import '../../services/permission_service.dart';
 import '../../supabase_service.dart';
 import '../../widgets/chip_selector.dart';
 import '../../widgets/place_card.dart';
@@ -26,7 +27,11 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _addressController = TextEditingController();
-  final _phoneController = TextEditingController();
+  // Несколько номеров телефона хранятся в одной текстовой колонке `phone`
+  // через запятую — без отдельной таблицы/миграции.
+  final List<TextEditingController> _phoneControllers = [
+    TextEditingController()
+  ];
   final _websiteController = TextEditingController();
   String? _category;
   String? _priceLevel;
@@ -62,7 +67,16 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
         _nameController.text = place.name;
         _descriptionController.text = place.description ?? '';
         _addressController.text = place.address ?? '';
-        _phoneController.text = place.phone ?? '';
+        final phones = (place.phone ?? '')
+            .split(',')
+            .map((p) => p.trim())
+            .where((p) => p.isNotEmpty)
+            .toList();
+        _phoneControllers
+          ..clear()
+          ..addAll(phones.isEmpty
+              ? [TextEditingController()]
+              : phones.map((p) => TextEditingController(text: p)));
         _websiteController.text = place.website ?? '';
         _category = place.category;
         _priceLevel = place.priceLevel;
@@ -85,13 +99,23 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     _addressController.dispose();
-    _phoneController.dispose();
+    for (final c in _phoneControllers) {
+      c.dispose();
+    }
     _websiteController.dispose();
     super.dispose();
   }
 
   bool get _canSave =>
       _nameController.text.trim().isNotEmpty && _category != null;
+
+  void _addPhoneField() =>
+      setState(() => _phoneControllers.add(TextEditingController()));
+
+  void _removePhoneField(int index) => setState(() {
+        _phoneControllers[index].dispose();
+        _phoneControllers.removeAt(index);
+      });
 
   Future<void> _addPhoto() async {
     if (_photoBytes.length >= 6) return;
@@ -114,7 +138,9 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
         ),
       ),
     );
-    if (source == null) return;
+    if (source == null || !mounted) return;
+    if (!await PermissionService.ensurePhotoAccess(context, source)) return;
+    if (!mounted) return;
     final file = await _picker.pickImage(
         source: source, maxWidth: 1600, imageQuality: 85);
     if (file == null) return;
@@ -135,7 +161,10 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
     final category = _category!;
     final description = _descriptionController.text.trim();
     final address = _addressController.text.trim();
-    final phone = _phoneController.text.trim();
+    final phone = _phoneControllers
+        .map((c) => c.text.trim())
+        .where((p) => p.isNotEmpty)
+        .join(', ');
     final website = _websiteController.text.trim();
     try {
       if (_isEditing) {
@@ -236,9 +265,29 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
                 Text(s(context).businessPhoneLabel,
                     style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
-                _buildField(theme, _phoneController,
-                    maxLines: 1, keyboardType: TextInputType.phone),
-                const SizedBox(height: 20),
+                for (var i = 0; i < _phoneControllers.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildField(theme, _phoneControllers[i],
+                              maxLines: 1, keyboardType: TextInputType.phone),
+                        ),
+                        if (_phoneControllers.length > 1)
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () => _removePhoneField(i),
+                          ),
+                      ],
+                    ),
+                  ),
+                TextButton.icon(
+                  onPressed: _addPhoneField,
+                  icon: const Icon(Icons.add_rounded),
+                  label: Text(s(context).addPhoneNumberButton),
+                ),
+                const SizedBox(height: 12),
                 Text(s(context).businessWebsiteLabel,
                     style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
