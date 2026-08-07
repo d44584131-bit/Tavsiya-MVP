@@ -29,9 +29,15 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
   final _addressController = TextEditingController();
   // Несколько номеров телефона хранятся в одной текстовой колонке `phone`
   // через запятую — без отдельной таблицы/миграции.
+  static const _phoneCountryCode = '+998 ';
   final List<TextEditingController> _phoneControllers = [
-    TextEditingController()
+    _newPhoneController()
   ];
+
+  static TextEditingController _newPhoneController([String? text]) =>
+      TextEditingController(text: text ?? _phoneCountryCode)
+        ..selection = TextSelection.collapsed(
+            offset: (text ?? _phoneCountryCode).length);
   final _websiteController = TextEditingController();
   String? _category;
   String? _priceLevel;
@@ -75,8 +81,8 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
         _phoneControllers
           ..clear()
           ..addAll(phones.isEmpty
-              ? [TextEditingController()]
-              : phones.map((p) => TextEditingController(text: p)));
+              ? [_newPhoneController()]
+              : phones.map((p) => _newPhoneController(p)));
         _websiteController.text = place.website ?? '';
         _category = place.category;
         _priceLevel = place.priceLevel;
@@ -110,7 +116,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
       _nameController.text.trim().isNotEmpty && _category != null;
 
   void _addPhoneField() =>
-      setState(() => _phoneControllers.add(TextEditingController()));
+      setState(() => _phoneControllers.add(_newPhoneController()));
 
   void _removePhoneField(int index) => setState(() {
         _phoneControllers[index].dispose();
@@ -163,7 +169,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
     final address = _addressController.text.trim();
     final phone = _phoneControllers
         .map((c) => c.text.trim())
-        .where((p) => p.isNotEmpty)
+        .where((p) => p.isNotEmpty && p != _phoneCountryCode.trim())
         .join(', ');
     final website = _websiteController.text.trim();
     try {
