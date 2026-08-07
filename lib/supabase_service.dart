@@ -242,6 +242,7 @@ class SupabaseService {
     String? address,
     String? phone,
     String? website,
+    String? instagram,
     String? priceLevel,
   }) async {
     final userId = _client.auth.currentUser?.id;
@@ -257,6 +258,7 @@ class SupabaseService {
           'address': address,
           'phone': phone,
           'website': website,
+          'instagram': instagram,
           'price_level': priceLevel,
           'created_by': userId,
         })
@@ -282,6 +284,7 @@ class SupabaseService {
     String? address,
     String? phone,
     String? website,
+    String? instagram,
     String? priceLevel,
   }) async {
     await _client.from('places').update({
@@ -291,6 +294,7 @@ class SupabaseService {
       'address': address,
       'phone': phone,
       'website': website,
+      'instagram': instagram,
       'price_level': priceLevel,
     }).eq('id', placeId);
   }
@@ -363,7 +367,7 @@ class SupabaseService {
     final row = await _client
         .from('places')
         .select(
-          'id, name, category, description, address, district, phone, website, price_level, '
+          'id, name, category, description, address, district, phone, website, instagram, price_level, '
           'is_verified, rating_avg, reviews_count, status',
         )
         .eq('id', id)
@@ -378,6 +382,7 @@ class SupabaseService {
       district: (row['district'] as String?) ?? '',
       phone: row['phone'] as String?,
       website: row['website'] as String?,
+      instagram: row['instagram'] as String?,
       priceLevel: row['price_level'] as String?,
       isVerified: row['is_verified'] as bool,
       rating: (row['rating_avg'] as num).toDouble(),

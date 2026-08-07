@@ -279,6 +279,10 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
         s(context).businessWebsiteLabel,
         detail?.website ?? s(context).notSpecified
       ),
+      (
+        s(context).businessInstagramLabel,
+        detail?.instagram ?? s(context).notSpecified
+      ),
       (s(context).avgCheckLabel, detail?.priceLevelLabel ?? '—'),
     ];
     return ListView(

@@ -638,3 +638,10 @@ create policy "places_select_approved_or_own" on public.places
 -- =========================================================
 
 alter table public.collections add column title_uz text;
+
+-- =========================================================
+-- МИГРАЦИЯ: Instagram заведения (профиль заведения — рядом с сайтом,
+-- телефоном и адресом; заполняется владельцем в форме заведения).
+-- =========================================================
+
+alter table public.places add column instagram text;

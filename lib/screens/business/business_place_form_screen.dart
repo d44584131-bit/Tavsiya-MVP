@@ -39,6 +39,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
         ..selection = TextSelection.collapsed(
             offset: (text ?? _phoneCountryCode).length);
   final _websiteController = TextEditingController();
+  final _instagramController = TextEditingController();
   String? _category;
   String? _priceLevel;
   double _rating = 0;
@@ -84,6 +85,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
               ? [_newPhoneController()]
               : phones.map((p) => _newPhoneController(p)));
         _websiteController.text = place.website ?? '';
+        _instagramController.text = place.instagram ?? '';
         _category = place.category;
         _priceLevel = place.priceLevel;
         _rating = place.rating;
@@ -109,6 +111,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
       c.dispose();
     }
     _websiteController.dispose();
+    _instagramController.dispose();
     super.dispose();
   }
 
@@ -172,6 +175,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
         .where((p) => p.isNotEmpty && p != _phoneCountryCode.trim())
         .join(', ');
     final website = _websiteController.text.trim();
+    final instagram = _instagramController.text.trim();
     try {
       if (_isEditing) {
         await SupabaseService.updateOwnedPlace(
@@ -182,6 +186,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
           address: address.isEmpty ? null : address,
           phone: phone.isEmpty ? null : phone,
           website: website.isEmpty ? null : website,
+          instagram: instagram.isEmpty ? null : instagram,
           priceLevel: _priceLevel,
         );
         if (!mounted) return;
@@ -204,6 +209,7 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
           address: address.isEmpty ? null : address,
           phone: phone.isEmpty ? null : phone,
           website: website.isEmpty ? null : website,
+          instagram: instagram.isEmpty ? null : instagram,
           priceLevel: _priceLevel,
         );
         for (final bytes in _photoBytes) {
@@ -299,6 +305,11 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
                 const SizedBox(height: 8),
                 _buildField(theme, _websiteController,
                     maxLines: 1, keyboardType: TextInputType.url),
+                const SizedBox(height: 20),
+                Text(s(context).businessInstagramLabel,
+                    style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                _buildField(theme, _instagramController, maxLines: 1),
                 const SizedBox(height: 20),
                 ChipSelector(
                   label: s(context).avgCheckLabel,

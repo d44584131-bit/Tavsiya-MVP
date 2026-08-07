@@ -36,6 +36,8 @@ class Strings {
   String get loadErrorGeneric =>
       _t('Не удалось загрузить данные', 'Maʼlumotlarni yuklab boʻlmadi');
   String get notSpecified => _t('Не указан', 'Koʻrsatilmagan');
+  String get linkOpenError =>
+      _t('Не удалось открыть ссылку', 'Havolani ochib boʻlmadi');
   String get cityName => _t('Ташкент', 'Toshkent');
 
   // ---------------------------------------------------------------
@@ -146,6 +148,7 @@ class Strings {
   String get callAction => _t('Позвонить', 'Qoʻngʻiroq');
   String get routeAction => _t('Маршрут', 'Yoʻnalish');
   String get websiteAction => _t('Сайт', 'Sayt');
+  String get instagramAction => _t('Instagram', 'Instagram');
   String get saveAction => _t('Сохранить', 'Saqlash');
   String get statRating => _t('Рейтинг', 'Reyting');
   String get statReviews => _t('Отзывов', 'Sharhlar');
@@ -164,6 +167,7 @@ class Strings {
   String get infoAddress => _t('Адрес', 'Manzil');
   String get infoPhone => _t('Телефон', 'Telefon');
   String get infoWebsite => _t('Сайт', 'Sayt');
+  String get infoInstagram => _t('Instagram', 'Instagram');
   String get infoAvgCheck => _t('Средний чек', 'Oʻrtacha chek');
   String get leaveReview => _t('Оставить отзыв', 'Sharh qoldirish');
   String get pendingBadge => _t('На модерации', 'Moderatsiyada');
@@ -332,6 +336,7 @@ class Strings {
   String get addPhoneNumberButton =>
       _t('Добавить номер', 'Raqam qoʻshish');
   String get businessWebsiteLabel => _t('Сайт', 'Sayt');
+  String get businessInstagramLabel => _t('Instagram', 'Instagram');
   String get saveButton => _t('Сохранить', 'Saqlash');
   String get businessSavedSnackbar =>
       _t('Изменения сохранены', 'Oʻzgarishlar saqlandi');

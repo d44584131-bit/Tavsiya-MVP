@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/strings.dart';
 import '../../services/share_service.dart';
 import '../../supabase_service.dart';
@@ -19,6 +20,7 @@ class PlaceDetailData {
   final String district;
   final String? phone;
   final String? website;
+  final String? instagram;
   final String? priceLevel; // 'budget' | 'mid' | 'mid_high' | 'high'
   final bool isVerified;
   final double rating;
@@ -34,6 +36,7 @@ class PlaceDetailData {
     required this.district,
     this.phone,
     this.website,
+    this.instagram,
     this.priceLevel,
     required this.isVerified,
     required this.rating,
@@ -392,11 +395,15 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         _QuickAction(
             icon: Icons.directions_rounded,
             label: s(context).routeAction,
-            onTap: () {}),
+            onTap: () => _openRoute(place)),
         _QuickAction(
             icon: Icons.language_rounded,
             label: s(context).websiteAction,
-            onTap: () {}),
+            onTap: () => _openWebsite(place)),
+        _QuickAction(
+            icon: Icons.camera_alt_rounded,
+            label: s(context).instagramAction,
+            onTap: () => _openInstagram(place)),
         _QuickAction(
           icon:
               _isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
@@ -547,6 +554,60 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         placeId: place.id, placeName: place.name, language: widget.language);
   }
 
+  void _showNotSpecified() {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(s(context).notSpecified)));
+  }
+
+  Future<void> _launch(Uri uri) async {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s(context).linkOpenError)));
+    }
+  }
+
+  Future<void> _openWebsite(PlaceDetailData place) async {
+    final website = place.website?.trim();
+    if (website == null || website.isEmpty) {
+      _showNotSpecified();
+      return;
+    }
+    final normalized =
+        website.startsWith('http://') || website.startsWith('https://')
+            ? website
+            : 'https://$website';
+    final uri = Uri.tryParse(normalized);
+    if (uri == null) return;
+    await _launch(uri);
+  }
+
+  Future<void> _openInstagram(PlaceDetailData place) async {
+    final instagram = place.instagram?.trim();
+    if (instagram == null || instagram.isEmpty) {
+      _showNotSpecified();
+      return;
+    }
+    final handle = instagram.replaceFirst(RegExp(r'^@'), '');
+    final target =
+        handle.startsWith('http') ? handle : 'https://instagram.com/$handle';
+    final uri = Uri.tryParse(target);
+    if (uri == null) return;
+    await _launch(uri);
+  }
+
+  Future<void> _openRoute(PlaceDetailData place) async {
+    final address = place.address?.trim();
+    if (address == null || address.isEmpty) {
+      _showNotSpecified();
+      return;
+    }
+    final query =
+        Uri.encodeComponent('$address, ${place.district}, ${s(context).cityName}');
+    await _launch(
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$query'));
+  }
+
   void _openPhotoViewer(int index) {
     Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
@@ -571,6 +632,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         Icons.language_rounded,
         s(context).infoWebsite,
         place.website ?? s(context).notSpecified
+      ),
+      (
+        Icons.camera_alt_rounded,
+        s(context).infoInstagram,
+        place.instagram ?? s(context).notSpecified
       ),
       (Icons.payments_rounded, s(context).infoAvgCheck, place.priceLevelLabel),
     ];
