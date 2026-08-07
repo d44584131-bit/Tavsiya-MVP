@@ -12,7 +12,6 @@ import 'screens/review_form/review_form_screen.dart';
 import 'widgets/notification_tile.dart';
 import 'widgets/place_card.dart';
 import 'widgets/place_review_card.dart';
-import 'widgets/review_list_item.dart';
 
 /// Единая точка доступа к Supabase. Инициализируется один раз в main()
 /// до runApp(): `await SupabaseService.init(url: ..., publishableKey: ...);`
@@ -475,13 +474,14 @@ class SupabaseService {
   }
 
   /// "Новые отзывы" на главном экране (и полный список с пагинацией на
-  /// отдельной странице) — последние approved-отзывы по всем местам.
-  static Future<List<ReviewListItemData>> fetchRecentReviews(
+  /// отдельной странице) — последние approved-отзывы по всем местам,
+  /// отображаются той же карточкой, что и в профиле места.
+  static Future<List<PlaceReviewData>> fetchRecentReviews(
       {required AppLanguage language, int limit = 10, int offset = 0}) async {
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, profiles!reviews_user_id_fkey(display_name, reviews_count), places(name)')
+            'rating, text, pros, cons, price_level, created_at, profiles!reviews_user_id_fkey(display_name, reviews_count), places(name), review_photos(storage_path)')
         .eq('status', 'approved')
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
@@ -489,12 +489,17 @@ class SupabaseService {
     return (rows as List).map((r) {
       final profile = r['profiles'] as Map<String, dynamic>?;
       final place = r['places'] as Map<String, dynamic>?;
-      return ReviewListItemData(
+      return PlaceReviewData(
         authorName: (profile?['display_name'] as String?) ??
             Strings(language).guestReviewer,
         placeName: (place?['name'] as String?) ?? '',
         stars: r['rating'] as int,
         text: r['text'] as String,
+        pros: r['pros'] as String?,
+        cons: r['cons'] as String?,
+        priceLevel: r['price_level'] as String?,
+        createdAt: DateTime.parse(r['created_at'] as String),
+        photoUrls: _photoUrlsFromRow(r),
         authorReviewsCount: profile?['reviews_count'] as int?,
       );
     }).toList();

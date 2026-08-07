@@ -4,7 +4,7 @@ import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
-import '../../widgets/review_list_item.dart';
+import '../../widgets/place_review_card.dart';
 import '../place/collections_list_screen.dart';
 import '../place/place_list_screen.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasMoreTrending = true;
   bool _isLoadingMoreTrending = false;
   final _trendingScrollController = ScrollController();
-  List<ReviewListItemData> _recentReviews = const [];
+  List<PlaceReviewData> _recentReviews = const [];
   List<CollectionData> _collections = const [];
 
   String? _selectedCategory;
@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _trending = trending;
         _hasMoreTrending = trending.length == _trendingPageSize;
-        _recentReviews = results[1] as List<ReviewListItemData>;
+        _recentReviews = results[1] as List<PlaceReviewData>;
         _collections = results[2] as List<CollectionData>;
         _isLoading = false;
       });
@@ -261,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 itemCount: _recentReviews.length,
                 itemBuilder: (context, i) => _StaggerIn(
                   index: i,
-                  child: ReviewListItem(data: _recentReviews[i]),
+                  child: PlaceReviewCard(data: _recentReviews[i]),
                 ),
               ),
             ),

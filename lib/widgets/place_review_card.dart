@@ -15,6 +15,8 @@ class PlaceReviewData {
   final String? moderationStatus; // 'pending' | 'rejected' | null (= approved)
   final int?
       authorReviewsCount; // null там, где автор — не другой пользователь (напр. "Мои отзывы")
+  final String?
+      placeName; // видно там, где отзывы разных мест показаны вместе (лента на главной)
 
   const PlaceReviewData({
     required this.authorName,
@@ -27,6 +29,7 @@ class PlaceReviewData {
     this.createdAt,
     this.moderationStatus,
     this.authorReviewsCount,
+    this.placeName,
   });
 }
 
@@ -89,6 +92,13 @@ class PlaceReviewCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    if (data.placeName != null) ...[
+                      const SizedBox(height: 2),
+                      Text(data.placeName!,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600)),
+                    ],
                     if (data.createdAt != null) ...[
                       const SizedBox(height: 2),
                       Text(_formatDate(data.createdAt!),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/review_list_item.dart';
+import '../../widgets/place_review_card.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
 
 /// "Все" у "Новых отзывов" на главном экране — полный список последних
@@ -23,7 +23,7 @@ class _AllReviewsScreenState extends State<AllReviewsScreen> {
   bool _isLoadingMore = false;
   bool _hasMore = true;
   bool _hasError = false;
-  List<ReviewListItemData> _reviews = const [];
+  List<PlaceReviewData> _reviews = const [];
 
   @override
   void initState() {
@@ -131,7 +131,7 @@ class _AllReviewsScreenState extends State<AllReviewsScreen> {
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
-        return ReviewListItem(data: _reviews[i]);
+        return PlaceReviewCard(data: _reviews[i]);
       },
     );
   }
