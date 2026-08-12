@@ -645,3 +645,161 @@ alter table public.collections add column title_uz text;
 -- =========================================================
 
 alter table public.places add column instagram text;
+
+-- =========================================================
+-- МИГРАЦИЯ: ответы на отзывы + лайки отзывов
+-- =========================================================
+-- Лайк переиспользует уже существующие review_helpful_votes/helpful_count
+-- (были в базовой схеме, но нигде не были подключены в интерфейсе) — в UI
+-- показывается как "лайк", в базе остаётся под старым именем.
+--
+-- Ответить на отзыв может любой авторизованный пользователь (обычный
+-- пользователь — на чужой отзыв, владелец заведения — на отзыв о своём
+-- месте); is_owner_reply проставляется автоматически триггером на основе
+-- place_owners, клиент этот флаг не передаёт и не может подделать.
+
+create table public.review_replies (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid not null references public.reviews (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  text text not null check (char_length(text) between 1 and 500),
+  is_owner_reply boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index review_replies_review_idx on public.review_replies (review_id, created_at);
+
+alter table public.review_replies enable row level security;
+
+create policy "review_replies_select_all" on public.review_replies for select using (true);
+create policy "review_replies_insert_own" on public.review_replies
+  for insert with check (auth.uid() = user_id);
+create policy "review_replies_delete_own" on public.review_replies
+  for delete using (auth.uid() = user_id);
+
+create or replace function public.set_review_reply_owner_flag()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.is_owner_reply := exists (
+    select 1
+    from public.reviews r
+    join public.place_owners po on po.place_id = r.place_id
+    where r.id = new.review_id and po.user_id = new.user_id
+  );
+  return new;
+end;
+$$;
+
+create trigger trg_review_reply_owner_flag
+  before insert on public.review_replies
+  for each row execute function public.set_review_reply_owner_flag();
+
+-- Уведомления о новом ответе/лайке — не блокируем сам ответ/лайк, если
+-- вставка уведомления не удалась (например, таблица notifications ещё не
+-- создана на момент применения этой миграции).
+create or replace function public.notify_review_reply()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_review_author uuid;
+  v_place_name text;
+  v_lang text;
+begin
+  select r.user_id, p.name into v_review_author, v_place_name
+  from public.reviews r join public.places p on p.id = r.place_id
+  where r.id = new.review_id;
+
+  if v_review_author is null or v_review_author = new.user_id then
+    return new; -- не уведомляем автора о его собственном ответе
+  end if;
+
+  select coalesce(preferred_language, 'ru') into v_lang
+  from public.profiles where id = v_review_author;
+
+  begin
+    insert into public.notifications (user_id, title, body)
+    values (
+      v_review_author,
+      case when v_lang = 'uz' then 'Sharhingizga javob yozildi' else 'Ответ на ваш отзыв' end,
+      case
+        when new.is_owner_reply and v_lang = 'uz' then '«' || v_place_name || '» muassasasi sharhingizga javob berdi'
+        when new.is_owner_reply then 'Заведение «' || v_place_name || '» ответило на ваш отзыв'
+        when v_lang = 'uz' then '«' || v_place_name || '» uchun sharhingizga yangi javob keldi'
+        else 'На ваш отзыв к «' || v_place_name || '» ответили'
+      end
+    );
+  exception when others then
+    null;
+  end;
+  return new;
+end;
+$$;
+
+create trigger trg_notify_review_reply
+  after insert on public.review_replies
+  for each row execute function public.notify_review_reply();
+
+create or replace function public.notify_review_helpful_vote()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_review_author uuid;
+  v_place_name text;
+  v_lang text;
+begin
+  select r.user_id, p.name into v_review_author, v_place_name
+  from public.reviews r join public.places p on p.id = r.place_id
+  where r.id = new.review_id;
+
+  if v_review_author is null or v_review_author = new.user_id then
+    return new; -- не уведомляем автора о лайке самому себе
+  end if;
+
+  select coalesce(preferred_language, 'ru') into v_lang
+  from public.profiles where id = v_review_author;
+
+  begin
+    insert into public.notifications (user_id, title, body)
+    values (
+      v_review_author,
+      case when v_lang = 'uz' then 'Sharhingiz yoqtirildi' else 'Вашему отзыву поставили лайк' end,
+      case when v_lang = 'uz'
+        then '«' || v_place_name || '» uchun sharhingiz birovga yoqdi'
+        else 'Кому-то понравился ваш отзыв к «' || v_place_name || '»'
+      end
+    );
+  exception when others then
+    null;
+  end;
+  return new;
+end;
+$$;
+
+create trigger trg_notify_review_helpful_vote
+  after insert on public.review_helpful_votes
+  for each row execute function public.notify_review_helpful_vote();
+
+-- profiles.helpful_votes_count существовал с самого начала, но ничего его не
+-- обновляло (всегда оставался 0) — досчитываем его тем же событием.
+create or replace function public.recalc_profile_helpful_votes_count()
+returns trigger language plpgsql as $$
+declare
+  v_user_id uuid;
+begin
+  select r.user_id into v_user_id
+  from public.reviews r where r.id = coalesce(new.review_id, old.review_id);
+
+  if v_user_id is not null then
+    update public.profiles
+    set helpful_votes_count = (
+      select count(*) from public.review_helpful_votes hv
+      join public.reviews r on r.id = hv.review_id
+      where r.user_id = v_user_id
+    )
+    where id = v_user_id;
+  end if;
+  return null;
+end;
+$$;
+
+create trigger trg_helpful_votes_recalc_profile
+  after insert or delete on public.review_helpful_votes
+  for each row execute function public.recalc_profile_helpful_votes_count();

@@ -105,6 +105,19 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
     }
   }
 
+  Future<bool> _submitReviewReply(PlaceReviewData review, String text) async {
+    try {
+      await SupabaseService.submitReviewReply(reviewId: review.id, text: text);
+      if (mounted) _loadReviews();
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s(context).replySubmitError)));
+      return false;
+    }
+  }
+
   Future<void> _editInfo() async {
     final updated = await Navigator.of(context).push<PlaceCardData>(
       MaterialPageRoute(
@@ -420,7 +433,10 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       itemCount: _reviews.length,
-      itemBuilder: (context, i) => PlaceReviewCard(data: _reviews[i]),
+      itemBuilder: (context, i) => PlaceReviewCard(
+        data: _reviews[i],
+        onSubmitReply: (text) => _submitReviewReply(_reviews[i], text),
+      ),
     );
   }
 }

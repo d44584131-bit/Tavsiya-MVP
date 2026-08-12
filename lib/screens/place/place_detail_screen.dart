@@ -156,6 +156,46 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
     }
   }
 
+  Future<void> _toggleReviewHelpful(PlaceReviewData review, bool like) async {
+    if (!await ensureAuthenticated(context, s(context).authRequiredActionLike)) {
+      return;
+    }
+    if (!mounted) return;
+    final index = _reviews.indexWhere((r) => r.id == review.id);
+    if (index == -1) return;
+    setState(() {
+      _reviews[index] = review.copyWith(
+        isHelpfulByMe: like,
+        helpfulCount: review.helpfulCount + (like ? 1 : -1),
+      );
+    });
+    try {
+      await SupabaseService.toggleReviewHelpful(review.id, like: like);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _reviews[index] = review);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s(context).likeError)));
+    }
+  }
+
+  Future<bool> _submitReviewReply(PlaceReviewData review, String text) async {
+    if (!await ensureAuthenticated(context, s(context).authRequiredActionReply)) {
+      return false;
+    }
+    if (!mounted) return false;
+    try {
+      await SupabaseService.submitReviewReply(reviewId: review.id, text: text);
+      if (mounted) _load();
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s(context).replySubmitError)));
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -511,7 +551,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       itemCount: _reviews.length,
-      itemBuilder: (context, i) => PlaceReviewCard(data: _reviews[i]),
+      itemBuilder: (context, i) => PlaceReviewCard(
+        data: _reviews[i],
+        onToggleHelpful: (like) => _toggleReviewHelpful(_reviews[i], like),
+        onSubmitReply: (text) => _submitReviewReply(_reviews[i], text),
+      ),
     );
   }
 

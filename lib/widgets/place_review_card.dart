@@ -4,7 +4,24 @@ import '../theme/app_colors.dart';
 import 'photo_viewer_screen.dart';
 import 'reviewer_level_badge.dart';
 
+class ReviewReplyData {
+  final String id;
+  final String authorName;
+  final String text;
+  final bool isOwnerReply;
+  final DateTime createdAt;
+
+  const ReviewReplyData({
+    required this.id,
+    required this.authorName,
+    required this.text,
+    required this.isOwnerReply,
+    required this.createdAt,
+  });
+}
+
 class PlaceReviewData {
+  final String id;
   final String authorName;
   final int stars;
   final String text;
@@ -18,8 +35,12 @@ class PlaceReviewData {
       authorReviewsCount; // null там, где автор — не другой пользователь (напр. "Мои отзывы")
   final String?
       placeName; // видно там, где отзывы разных мест показаны вместе (лента на главной)
+  final int helpfulCount; // лайки — переиспользует review_helpful_votes
+  final bool isHelpfulByMe;
+  final List<ReviewReplyData> replies;
 
   const PlaceReviewData({
+    required this.id,
     required this.authorName,
     required this.stars,
     required this.text,
@@ -31,18 +52,81 @@ class PlaceReviewData {
     this.moderationStatus,
     this.authorReviewsCount,
     this.placeName,
+    this.helpfulCount = 0,
+    this.isHelpfulByMe = false,
+    this.replies = const [],
   });
+
+  PlaceReviewData copyWith({
+    int? helpfulCount,
+    bool? isHelpfulByMe,
+    List<ReviewReplyData>? replies,
+  }) {
+    return PlaceReviewData(
+      id: id,
+      authorName: authorName,
+      stars: stars,
+      text: text,
+      photoUrls: photoUrls,
+      pros: pros,
+      cons: cons,
+      priceLevel: priceLevel,
+      createdAt: createdAt,
+      moderationStatus: moderationStatus,
+      authorReviewsCount: authorReviewsCount,
+      placeName: placeName,
+      helpfulCount: helpfulCount ?? this.helpfulCount,
+      isHelpfulByMe: isHelpfulByMe ?? this.isHelpfulByMe,
+      replies: replies ?? this.replies,
+    );
+  }
 }
 
-class PlaceReviewCard extends StatelessWidget {
+class PlaceReviewCard extends StatefulWidget {
   final PlaceReviewData data;
-  const PlaceReviewCard({super.key, required this.data});
+  // null — лайк/ответ недоступны в этом контексте (например, лента "Новые
+  // отзывы" на главной): кнопки скрываются, счётчик лайков просто виден.
+  final ValueChanged<bool>? onToggleHelpful;
+  final Future<bool> Function(String text)? onSubmitReply;
+  const PlaceReviewCard(
+      {super.key, required this.data, this.onToggleHelpful, this.onSubmitReply});
+
+  @override
+  State<PlaceReviewCard> createState() => _PlaceReviewCardState();
+}
+
+class _PlaceReviewCardState extends State<PlaceReviewCard> {
+  bool _showReplyBox = false;
+  bool _isSubmittingReply = false;
+  final _replyController = TextEditingController();
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
 
   static String _formatDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
 
+  Future<void> _submitReply() async {
+    final text = _replyController.text.trim();
+    if (text.isEmpty || widget.onSubmitReply == null || _isSubmittingReply) {
+      return;
+    }
+    setState(() => _isSubmittingReply = true);
+    final ok = await widget.onSubmitReply!(text);
+    if (!mounted) return;
+    setState(() => _isSubmittingReply = false);
+    if (ok) {
+      _replyController.clear();
+      setState(() => _showReplyBox = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final data = widget.data;
     final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -234,6 +318,147 @@ class PlaceReviewCard extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: widget.onToggleHelpful == null
+                    ? null
+                    : () => widget.onToggleHelpful!(!data.isHelpfulByMe),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        data.isHelpfulByMe
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 18,
+                        color: data.isHelpfulByMe
+                            ? AppColors.negative
+                            : theme.textTheme.bodyMedium?.color,
+                      ),
+                      if (data.helpfulCount > 0) ...[
+                        const SizedBox(width: 4),
+                        Text('${data.helpfulCount}',
+                            style: theme.textTheme.labelMedium),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (widget.onSubmitReply != null) ...[
+                const SizedBox(width: 8),
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () =>
+                      setState(() => _showReplyBox = !_showReplyBox),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 4),
+                    child: Text(s(context).replyButton,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (data.replies.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            ...data.replies.map((reply) => _ReplyTile(reply: reply)),
+          ],
+          if (_showReplyBox) ...[
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _replyController,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: s(context).replyHint,
+                      filled: true,
+                      fillColor: theme.scaffoldBackgroundColor,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: theme.dividerColor)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _isSubmittingReply
+                    ? const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child:
+                            Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : IconButton(
+                        onPressed: _submitReply,
+                        icon: Icon(Icons.send_rounded,
+                            color: theme.colorScheme.primary),
+                      ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyTile extends StatelessWidget {
+  final ReviewReplyData reply;
+  const _ReplyTile({required this.reply});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(reply.authorName,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              if (reply.isOwnerReply) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(s(context).ownerReplyBadge,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary)),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(reply.text, style: theme.textTheme.bodyMedium),
         ],
       ),
     );

@@ -179,6 +179,14 @@ class Strings {
       'Joyni saqlab boʻlmadi, qayta urinib koʻring');
   String get guestReviewer => _t('Гость', 'Mehmon');
   String get placeDeleted => _t('Место удалено', 'Joy oʻchirilgan');
+  String get replyButton => _t('Ответить', 'Javob berish');
+  String get replyHint => _t('Написать ответ…', 'Javob yozing…');
+  String get ownerReplyBadge => _t('Ответ от заведения', 'Muassasa javobi');
+  String get replySubmitError => _t(
+      'Не удалось отправить ответ, попробуйте ещё раз',
+      'Javobni yuborib boʻlmadi, qayta urinib koʻring');
+  String get likeError => _t('Не удалось поставить лайк, попробуйте ещё раз',
+      'Layk qoʻyib boʻlmadi, qayta urinib koʻring');
 
   // ---------------------------------------------------------------
   // Список мест / подборки (place_list_screen.dart, collections_list_screen.dart)
@@ -301,6 +309,10 @@ class Strings {
   String get authRequiredActionReview =>
       _t('оставить отзыв', 'sharh qoldirish');
   String get authRequiredActionSave => _t('сохранить место', 'joyni saqlash');
+  String get authRequiredActionLike =>
+      _t('поставить лайк', 'layk qoʻyish');
+  String get authRequiredActionReply =>
+      _t('ответить на отзыв', 'sharhga javob berish');
   String get cancelButton => _t('Отмена', 'Bekor qilish');
 
   // ---------------------------------------------------------------

@@ -74,12 +74,14 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, pros, cons, price_level, status, created_at, places(name), review_photos(storage_path)')
+            'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, '
+            'places(name), review_photos(storage_path), review_helpful_votes(user_id)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
     return (rows as List)
         .map((r) => PlaceReviewData(
+              id: r['id'] as String,
               authorName:
                   (r['places'] as Map<String, dynamic>?)?['name'] as String? ??
                       Strings(language).placeDeleted,
@@ -92,8 +94,17 @@ class SupabaseService {
               photoUrls: _photoUrlsFromRow(r),
               moderationStatus:
                   r['status'] == 'approved' ? null : r['status'] as String?,
+              helpfulCount: r['helpful_count'] as int? ?? 0,
+              isHelpfulByMe: _isHelpfulByMe(r, userId),
             ))
         .toList();
+  }
+
+  static bool _isHelpfulByMe(Map<String, dynamic> r, String? userId) {
+    if (userId == null) return false;
+    final votes = r['review_helpful_votes'] as List?;
+    if (votes == null) return false;
+    return votes.any((v) => (v as Map<String, dynamic>)['user_id'] == userId);
   }
 
   /// Сохраняет выбранный язык интерфейса в профиль — читается сервером
@@ -442,17 +453,23 @@ class SupabaseService {
   /// обеспечивает RLS-политика reviews_select_approved_or_own.
   static Future<List<PlaceReviewData>> fetchApprovedReviews(String placeId,
       {required AppLanguage language, int limit = 20}) async {
+    final userId = _client.auth.currentUser?.id;
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, pros, cons, price_level, status, created_at, profiles!reviews_user_id_fkey(display_name, reviews_count), review_photos(storage_path)')
+            'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, '
+            'profiles!reviews_user_id_fkey(display_name, reviews_count), '
+            'review_photos(storage_path), review_helpful_votes(user_id), '
+            'review_replies(id, text, is_owner_reply, created_at, profiles!review_replies_user_id_fkey(display_name))')
         .eq('place_id', placeId)
+        .order('helpful_count', ascending: false)
         .order('created_at', ascending: false)
         .limit(limit);
 
     return (rows as List).map((r) {
       final profile = r['profiles'] as Map<String, dynamic>?;
       return PlaceReviewData(
+        id: r['id'] as String,
         authorName: (profile?['display_name'] as String?) ??
             Strings(language).guestReviewer,
         stars: r['rating'] as int,
@@ -465,8 +482,31 @@ class SupabaseService {
         moderationStatus:
             r['status'] == 'approved' ? null : r['status'] as String?,
         authorReviewsCount: profile?['reviews_count'] as int?,
+        helpfulCount: r['helpful_count'] as int? ?? 0,
+        isHelpfulByMe: _isHelpfulByMe(r, userId),
+        replies: _repliesFromRow(r, language),
       );
     }).toList();
+  }
+
+  static List<ReviewReplyData> _repliesFromRow(
+      Map<String, dynamic> r, AppLanguage language) {
+    final raw = r['review_replies'] as List?;
+    if (raw == null || raw.isEmpty) return const [];
+    final replies = raw.map((rr) {
+      final map = rr as Map<String, dynamic>;
+      final replyProfile = map['profiles'] as Map<String, dynamic>?;
+      return ReviewReplyData(
+        id: map['id'] as String,
+        authorName: (replyProfile?['display_name'] as String?) ??
+            Strings(language).guestReviewer,
+        text: map['text'] as String,
+        isOwnerReply: map['is_owner_reply'] as bool,
+        createdAt: DateTime.parse(map['created_at'] as String),
+      );
+    }).toList();
+    replies.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return replies;
   }
 
   static List<String> _photoUrlsFromRow(Map<String, dynamic> r) {
@@ -483,10 +523,13 @@ class SupabaseService {
   /// отображаются той же карточкой, что и в профиле места.
   static Future<List<PlaceReviewData>> fetchRecentReviews(
       {required AppLanguage language, int limit = 10, int offset = 0}) async {
+    final userId = _client.auth.currentUser?.id;
     final rows = await _client
         .from('reviews')
         .select(
-            'rating, text, pros, cons, price_level, created_at, profiles!reviews_user_id_fkey(display_name, reviews_count), places(name), review_photos(storage_path)')
+            'id, rating, text, pros, cons, price_level, created_at, helpful_count, '
+            'profiles!reviews_user_id_fkey(display_name, reviews_count), places(name), '
+            'review_photos(storage_path), review_helpful_votes(user_id)')
         .eq('status', 'approved')
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
@@ -495,6 +538,7 @@ class SupabaseService {
       final profile = r['profiles'] as Map<String, dynamic>?;
       final place = r['places'] as Map<String, dynamic>?;
       return PlaceReviewData(
+        id: r['id'] as String,
         authorName: (profile?['display_name'] as String?) ??
             Strings(language).guestReviewer,
         placeName: (place?['name'] as String?) ?? '',
@@ -506,6 +550,8 @@ class SupabaseService {
         createdAt: DateTime.parse(r['created_at'] as String),
         photoUrls: _photoUrlsFromRow(r),
         authorReviewsCount: profile?['reviews_count'] as int?,
+        helpfulCount: r['helpful_count'] as int? ?? 0,
+        isHelpfulByMe: _isHelpfulByMe(r, userId),
       );
     }).toList();
   }
@@ -572,6 +618,41 @@ class SupabaseService {
     } catch (_) {
       // уведомление в Telegram не критично для успешной публикации отзыва
     }
+  }
+
+  /// "Лайк" отзыва — переиспользует таблицу review_helpful_votes (была в
+  /// базовой схеме под смыслом "отметить полезным", но нигде не была
+  /// подключена в интерфейсе); helpful_count и уведомление автору обновляются
+  /// триггерами на сервере (см. schema.sql).
+  static Future<void> toggleReviewHelpful(String reviewId,
+      {required bool like}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+    if (like) {
+      await _client
+          .from('review_helpful_votes')
+          .insert({'review_id': reviewId, 'user_id': userId});
+    } else {
+      await _client
+          .from('review_helpful_votes')
+          .delete()
+          .eq('review_id', reviewId)
+          .eq('user_id', userId);
+    }
+  }
+
+  /// Ответ на отзыв — от обычного пользователя или от владельца места
+  /// (флаг is_owner_reply и уведомление автору отзыва проставляются
+  /// триггерами на сервере, см. schema.sql — клиент их не передаёт).
+  static Future<void> submitReviewReply(
+      {required String reviewId, required String text}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Пользователь не авторизован');
+    await _client.from('review_replies').insert({
+      'review_id': reviewId,
+      'user_id': userId,
+      'text': text,
+    });
   }
 
   // ------------------------------------------------------------
