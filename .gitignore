@@ -1,3 +1,6 @@
+# Временная папка для локального импорта фото в Supabase Storage — не коммитим
+_photos_import/
+
 # Miscellaneous
 *.class
 *.log
