@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
 
 class PlaceCardData {
   final String id;
@@ -27,138 +27,87 @@ class PlaceCardData {
   });
 }
 
-IconData _categoryIcon(String category) => switch (category) {
-      'restaurant' => Icons.restaurant_rounded,
-      'cafe' => Icons.coffee_rounded,
-      'park' => Icons.park_rounded,
-      'mall' => Icons.storefront_rounded,
-      _ => Icons.place_rounded,
-    };
-
-/// Горизонтальная карточка места с градиентной "шапкой"-иллюстрацией.
-/// Ширина фиксирована — используется внутри горизонтального ListView.
+/// Карточка места в стиле VenueBubble из бандла Ember: сплошная заливка
+/// цветом категории, один "срезанный" угол снизу (хвостик пузыря),
+/// рейтинг — тёмная плашка в углу. Используется в горизонтальной ленте
+/// "Сейчас популярно" — ширина фиксирована.
 class PlaceCard extends StatelessWidget {
   final PlaceCardData data;
   final VoidCallback? onTap;
-  const PlaceCard({super.key, required this.data, this.onTap});
+  final bool tailRight;
+  const PlaceCard(
+      {super.key, required this.data, this.onTap, this.tailRight = false});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final color = AppColors.categoryColor(data.category);
+    final onDark = AppColors.categoryOnDark(data.category);
+    final strong = onDark ? Colors.white : const Color(0xFF111111);
+    final quiet = onDark
+        ? Colors.white.withValues(alpha: 0.8)
+        : Colors.black.withValues(alpha: 0.6);
 
     return Container(
-      width: 168,
-      margin: const EdgeInsets.only(right: 14),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: AppColors.tintedShadow(isDark: false, opacity: 0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
+      width: 208,
+      margin: const EdgeInsets.only(right: 12),
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
+        color: color,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(AppRadius.venue),
+          topRight: const Radius.circular(AppRadius.venue),
+          bottomLeft: Radius.circular(
+              tailRight ? AppRadius.venue : AppRadius.venueTail),
+          bottomRight: Radius.circular(
+              tailRight ? AppRadius.venueTail : AppRadius.venue),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    height: 96,
-                    decoration: BoxDecoration(
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(20)),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: AppColors.headerGradient(data.category,
-                            isDark: isDark),
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        // едва заметная текстура поверх градиента
-                        Positioned.fill(
-                          child: Opacity(
-                            opacity: 0.08,
-                            child: CustomPaint(painter: _NoisePainter()),
-                          ),
-                        ),
-                        Center(
-                          child: Icon(_categoryIcon(data.category),
-                              size: 40,
-                              color: Colors.white.withValues(alpha: 0.9)),
-                        ),
-                      ],
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(data.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              height: 1.15,
+                              color: strong)),
+                      const SizedBox(height: 4),
+                      Text(data.district,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              color: quiet)),
+                    ],
                   ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        s(context).categoryLabel(data.category).toUpperCase(),
-                        style: GoogleFonts.jetBrainsMono(
-                            color: Colors.white,
-                            fontSize: 10,
-                            letterSpacing: 0.6,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded,
-                            size: 14, color: AppColors.accentOrange),
-                        const SizedBox(width: 2),
-                        Text(data.rating.toStringAsFixed(1),
-                            style: theme.textTheme.labelSmall),
-                        const SizedBox(width: 4),
-                        Text('(${data.reviewsCount})',
-                            style: theme.textTheme.labelSmall),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(data.district,
-                        style: theme.textTheme.labelSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111010),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text('★ ${data.rating.toStringAsFixed(1)}',
+                      style: GoogleFonts.jetBrainsMono(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                          color: Colors.white)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -195,72 +144,15 @@ class _PlaceCardSkeletonState extends State<PlaceCardSkeleton>
         final base = theme.dividerColor;
         final shimmer = Color.lerp(base, theme.cardColor, _c.value)!;
         return Container(
-          width: 168,
-          margin: const EdgeInsets.only(right: 14),
+          width: 208,
+          height: 82,
+          margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.dividerColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                height: 96,
-                decoration: BoxDecoration(
-                  color: shimmer,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(height: 14, width: 110, color: shimmer),
-                    const SizedBox(height: 8),
-                    Container(height: 10, width: 70, color: shimmer),
-                    const SizedBox(height: 6),
-                    Container(height: 10, width: 90, color: shimmer),
-                  ],
-                ),
-              ),
-            ],
+            color: shimmer,
+            borderRadius: BorderRadius.circular(AppRadius.venue),
           ),
         );
       },
     );
   }
-}
-
-/// Едва заметная зернистая текстура поверх градиента (не плоская заливка).
-class _NoisePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white;
-    final rnd = _seededRandomPoints(size);
-    for (final p in rnd) {
-      canvas.drawCircle(p, 0.6, paint);
-    }
-  }
-
-  List<Offset> _seededRandomPoints(Size size) {
-    final points = <Offset>[];
-    var seed = 42;
-    int next() {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      return seed;
-    }
-
-    for (int i = 0; i < 140; i++) {
-      final x = (next() % size.width.toInt()).toDouble();
-      final y = (next() % size.height.toInt()).toDouble();
-      points.add(Offset(x, y));
-    }
-    return points;
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

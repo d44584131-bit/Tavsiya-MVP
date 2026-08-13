@@ -1,27 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/category_folder_card.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
 import '../../widgets/place_review_card.dart';
+import '../../widgets/section_header.dart';
 import '../place/collections_list_screen.dart';
 import '../place/place_list_screen.dart';
 import '../profile/profile_screen.dart' show AppLanguage;
 import '../reviews/all_reviews_screen.dart';
 
-class _CategoryItem {
-  final String key;
-  final IconData icon;
-  const _CategoryItem(this.key, this.icon);
-}
-
-const _categories = [
-  _CategoryItem('restaurant', Icons.restaurant_rounded),
-  _CategoryItem('cafe', Icons.coffee_rounded),
-  _CategoryItem('park', Icons.park_rounded),
-  _CategoryItem('mall', Icons.storefront_rounded),
-];
+const _categories = ['restaurant', 'cafe', 'park', 'mall'];
 
 class CollectionData {
   final String id;
@@ -235,25 +227,29 @@ class _HomeScreenState extends State<HomeScreen> {
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(theme)),
           SliverToBoxAdapter(
-            child: _SectionTitle(
-                title: s(context).trendingTitle, onSeeAll: _openAllTrending),
+            child: SectionHeader(
+                title: s(context).trendingTitle,
+                actionLabel: s(context).seeAll,
+                onAction: _openAllTrending),
           ),
           SliverToBoxAdapter(child: _buildTrendingRow()),
           SliverToBoxAdapter(child: _buildCategoryFilterHeader(theme)),
           if (_selectedCategory != null) _buildFilterResultsSliver(theme),
           if (!_isLoading && _collections.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionTitle(
+              child: SectionHeader(
                   title: s(context).collectionsTitle,
-                  onSeeAll: _openAllCollections),
+                  actionLabel: s(context).seeAll,
+                  onAction: _openAllCollections),
             ),
             SliverToBoxAdapter(child: _buildCollectionsCarousel(theme)),
           ],
           if (!_isLoading && _recentReviews.isNotEmpty) ...[
             SliverToBoxAdapter(
-              child: _SectionTitle(
+              child: SectionHeader(
                   title: s(context).recentReviewsTitle,
-                  onSeeAll: _openAllReviews),
+                  actionLabel: s(context).seeAll,
+                  onAction: _openAllReviews),
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -274,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeader(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -285,24 +281,26 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: _openCityPicker,
               borderRadius: BorderRadius.circular(10),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.location_on_rounded,
-                        size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Text(s(context).cityLabel(widget.selectedCity),
-                        style: theme.textTheme.titleMedium),
+                    Text(s(context).cityLabel(widget.selectedCity).toUpperCase(),
+                        style: GoogleFonts.jetBrainsMono(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            letterSpacing: 1.2,
+                            color: theme.textTheme.labelSmall?.color)),
                     const SizedBox(width: 2),
                     Icon(Icons.keyboard_arrow_down_rounded,
-                        size: 18, color: theme.textTheme.bodyMedium?.color),
+                        size: 16, color: theme.textTheme.labelSmall?.color),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          Text(s(context).homeTitle, style: theme.textTheme.headlineLarge),
+          const SizedBox(height: 16),
           Material(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -310,16 +308,19 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: widget.onOpenSearch,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                height: 50,
+                height: 48,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.dividerColor),
+                  border: Border.all(color: theme.dividerColor, width: 1.5),
                 ),
                 child: Row(
                   children: [
                     const SizedBox(width: 14),
-                    Icon(Icons.search_rounded,
-                        color: theme.textTheme.bodyMedium?.color),
+                    Text('⌕',
+                        style: GoogleFonts.jetBrainsMono(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: theme.textTheme.labelSmall?.color)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(s(context).searchHint,
@@ -338,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTrendingRow() {
     return SizedBox(
-      height: 190,
+      height: 104,
       child: _isLoading
           ? ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -372,6 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       index: i,
                       child: PlaceCard(
                           data: place,
+                          tailRight: i.isOdd,
                           onTap: () => widget.onPlaceTap?.call(place)),
                     );
                   },
@@ -383,64 +385,26 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        SectionHeader(title: s(context).categoriesTitle),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-          child: Text(s(context).categoriesTitle,
-              style: theme.textTheme.headlineMedium),
-        ),
-        SizedBox(
-          height: 92,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _categories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (context, i) {
-              final c = _categories[i];
-              final isActive = _selectedCategory == c.key;
-              return Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(18),
-                child: InkWell(
-                  onTap: () => _onCategoryTap(c.key),
-                  borderRadius: BorderRadius.circular(18),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Column(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? theme.colorScheme.primary
-                                    .withValues(alpha: 0.15)
-                                : theme.cardColor,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                                color: isActive
-                                    ? theme.colorScheme.primary
-                                    : theme.dividerColor,
-                                width: isActive ? 1.5 : 1),
-                          ),
-                          child: Icon(c.icon, color: theme.colorScheme.primary),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          s(context).categoryPlural(c.key),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: isActive ? theme.colorScheme.primary : null,
-                            fontWeight: isActive ? FontWeight.w700 : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+          child: GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.1,
+            children: _categories.map((c) {
+              final isActive = _selectedCategory == c;
+              return CategoryFolderCard(
+                label: s(context).categoryPlural(c),
+                color: AppColors.categoryColor(c),
+                onDark: AppColors.categoryOnDark(c),
+                active: isActive,
+                onTap: () => _onCategoryTap(c),
               );
-            },
+            }).toList(),
           ),
         ),
       ],
@@ -481,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCollectionsCarousel(ThemeData theme) {
     return SizedBox(
-      height: 64,
+      height: 78,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -489,26 +453,14 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final collection = _collections[i];
-          return Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: Ink(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: AppColors.headerGradient(_categories[i % 4].key,
-                        isDark: theme.brightness == Brightness.dark)),
-              ),
-              child: InkWell(
-                onTap: () => _openCollection(collection),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  alignment: Alignment.center,
-                  child: Text(collection.title,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ),
+          final category = _categories[i % _categories.length];
+          return SizedBox(
+            width: 160,
+            child: CategoryFolderCard(
+              label: collection.title,
+              color: AppColors.categoryColor(category),
+              onDark: AppColors.categoryOnDark(category),
+              onTap: () => _openCollection(collection),
             ),
           );
         },
@@ -579,27 +531,6 @@ class _CityPickerSheet extends StatelessWidget {
               ),
             );
           }),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  final VoidCallback onSeeAll;
-  const _SectionTitle({required this.title, required this.onSeeAll});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: theme.textTheme.headlineMedium),
-          TextButton(onPressed: onSeeAll, child: Text(s(context).seeAll)),
         ],
       ),
     );

@@ -112,6 +112,7 @@ class Strings {
   // ---------------------------------------------------------------
   // Главная (home_screen.dart)
   // ---------------------------------------------------------------
+  String get homeTitle => _t('Главная', 'Bosh sahifa');
   String get searchHint => _t('Найти место…', 'Joy qidirish…');
   String get trendingTitle => _t('Сейчас популярно', 'Hozir mashhur');
   String get categoriesTitle => _t('Категории', 'Kategoriyalar');

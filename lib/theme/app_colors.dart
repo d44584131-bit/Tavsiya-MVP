@@ -48,6 +48,27 @@ class AppColors {
     return base.withValues(alpha: opacity);
   }
 
+  /// Сплошной (не градиентный) фирменный цвет категории — как заливка
+  /// VenueBubble/CategoryFolder в бандле Ember. В отличие от [headerGradient]
+  /// это ровно те hex-токены cat-restaurant/cat-cafe/cat-park/cat-mall.
+  static Color categoryColor(String category) => switch (category) {
+        'restaurant' => const Color(0xFFFF7A66),
+        'cafe' => const Color(0xFFFFC42E),
+        'park' => const Color(0xFF38B96A),
+        'mall' => const Color(0xFFB79CF5),
+        _ => const Color(0xFF6B675F),
+      };
+
+  /// Достаточно ли тёмная заливка категории, чтобы текст поверх был белым
+  /// (иначе — тёмный текст). Соответствует onDark из бандла.
+  static bool categoryOnDark(String category) => switch (category) {
+        'restaurant' => true,
+        'cafe' => false,
+        'park' => true,
+        'mall' => false,
+        _ => true,
+      };
+
   /// Тональный (одноцветный) градиент для "шапок" карточек мест — цвета
   /// категорий фиксированы дизайн-системой (Ember): ресторан/кафе/парк/ТЦ.
   /// category: 'restaurant' | 'cafe' | 'park' | 'mall'
