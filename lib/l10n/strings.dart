@@ -340,6 +340,14 @@ class Strings {
   String get businessExitButton =>
       _t('Выйти из режима заведения', 'Muassasa rejimidan chiqish');
   String get businessListTitle => _t('Мои заведения', 'Mening muassasalarim');
+  String get businessModeLabel => _t('Режим заведения', 'Muassasa rejimi');
+  String get totalReviewsLabel => _t('Всего отзывов', 'Jami sharhlar');
+  String get ratingLabel => _t('Рейтинг', 'Reyting');
+  String get unansweredLabel => _t('Без ответа', 'Javobsiz');
+  String unansweredCount(int count) =>
+      _uz ? '$count ta javobsiz' : '$count без ответа';
+  String reviewsAboutPlace(String placeName) =>
+      _t('Отзывы о $placeName', '$placeName haqida sharhlar');
   String get businessEmptyTitle =>
       _t('У вас пока нет заведений', 'Sizda hali muassasa yoʻq');
   String get businessEmptySubtitle => _t(

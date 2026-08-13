@@ -25,8 +25,12 @@ class PlaceOwnerPhotoData {
 class BusinessDashboardScreen extends StatefulWidget {
   final PlaceCardData place;
   final AppLanguage language;
+  final int initialTabIndex;
   const BusinessDashboardScreen(
-      {super.key, required this.place, required this.language});
+      {super.key,
+      required this.place,
+      required this.language,
+      this.initialTabIndex = 0});
 
   @override
   State<BusinessDashboardScreen> createState() =>
@@ -35,8 +39,8 @@ class BusinessDashboardScreen extends StatefulWidget {
 
 class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController =
-      TabController(length: 3, vsync: this);
+  late final TabController _tabController = TabController(
+      length: 3, vsync: this, initialIndex: widget.initialTabIndex);
   late PlaceCardData _place = widget.place;
   final _picker = ImagePicker();
 
