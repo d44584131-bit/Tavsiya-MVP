@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../l10n/strings.dart';
+import '../../supabase_service.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/dot_indicator.dart';
 import '../../widgets/pattern_dots_background.dart';
 import '../../widgets/review_bubble.dart';
@@ -26,8 +29,8 @@ class OnboardingPageData {
 class _CategoryChip {
   final String
       categoryKey; // 'restaurant' | 'cafe' | 'park' | 'mall' — метка переводится на месте
-  final IconData icon;
-  const _CategoryChip(this.categoryKey, this.icon);
+  final int? count; // реальное число мест, подгружается асинхронно
+  const _CategoryChip(this.categoryKey, {this.count});
 }
 
 class _ReviewSnippet {
@@ -49,6 +52,18 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
   int _index = 0;
+  Map<String, int>? _categoryCounts;
+
+  @override
+  void initState() {
+    super.initState();
+    // Реальные числа мест по категориям для карточек 2-го экрана — не
+    // критично для онбординга, поэтому без спиннеров: пока не пришло,
+    // карточки просто показываются без подписи "N мест".
+    SupabaseService.fetchCategoryCounts().then((counts) {
+      if (mounted) setState(() => _categoryCounts = counts);
+    }).catchError((_) {});
+  }
 
   List<OnboardingPageData> _pages(BuildContext context) => [
         OnboardingPageData(
@@ -65,11 +80,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           titlePrefix: s(context).onboard2TitlePrefix,
           titleAccent: s(context).onboard2TitleAccent,
           subtitle: s(context).onboard2Subtitle,
-          categories: const [
-            _CategoryChip('restaurant', Icons.restaurant_rounded),
-            _CategoryChip('cafe', Icons.coffee_rounded),
-            _CategoryChip('park', Icons.park_rounded),
-            _CategoryChip('mall', Icons.storefront_rounded),
+          categories: [
+            _CategoryChip('restaurant', count: _categoryCounts?['restaurant']),
+            _CategoryChip('cafe', count: _categoryCounts?['cafe']),
+            _CategoryChip('park', count: _categoryCounts?['park']),
+            _CategoryChip('mall', count: _categoryCounts?['mall']),
           ],
         ),
         OnboardingPageData(
@@ -114,20 +129,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  child: TextButton(
-                    onPressed: widget.onFinish,
-                    child: Text(
-                      s(context).skip,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyMedium?.color),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      s(context).stepLabel(_index + 1, pages.length),
+                      style: GoogleFonts.jetBrainsMono(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                        letterSpacing: 1,
+                        color: Theme.of(context).textTheme.labelSmall?.color,
+                      ),
                     ),
-                  ),
+                    TextButton(
+                      onPressed: widget.onFinish,
+                      child: Text(
+                        s(context).skip,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color:
+                                Theme.of(context).textTheme.bodyMedium?.color),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(
@@ -225,53 +251,57 @@ class _OnboardingPageState extends State<_OnboardingPage>
     );
   }
 
-  Widget _bubbleWall(BuildContext context) {
+  /// Равномерно распределённые по высоте "холста" координаты Y (от -0.88
+  /// до 0.88) — чтобы N пузырей заполняли всю зону, а не жались к низу.
+  static List<double> _scatterYs(int n) {
+    if (n <= 1) return const [0.0];
+    const span = 1.76;
+    return List.generate(n, (i) => -0.88 + i * (span / (n - 1)));
+  }
+
+  Widget _bubbleWall(BuildContext context, double wallHeight) {
     final d = widget.data;
     if (d.highlights != null) {
-      // Колонка, а не Stack с абсолютным позиционированием — иначе высота
-      // "стены" не учитывает второй пузырь, и он наезжает на заголовок ниже
-      // (был баг с наложением элементов друг на друга).
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ReviewBubble(
-              tilt: BubbleTilt.leftSoft,
-              child: Text(d.highlights![0]),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                ReviewBubble(
-                  tilt: BubbleTilt.rightSoft,
-                  child: Text(d.highlights![1]),
+      final ys = _scatterYs(d.highlights!.length);
+      return SizedBox(
+        width: double.infinity,
+        height: wallHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (final entry in d.highlights!.asMap().entries)
+              Align(
+                alignment:
+                    Alignment(entry.key.isEven ? -0.92 : 0.92, ys[entry.key]),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ReviewBubble(
+                      hero: true,
+                      tilt: entry.key.isEven
+                          ? BubbleTilt.leftSoft
+                          : BubbleTilt.rightSoft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: Text(entry.value),
+                      ),
+                    ),
+                    if (entry.key == 1)
+                      const Positioned(
+                          top: -16, left: -14, child: Doodle(size: 22)),
+                  ],
                 ),
-                const Positioned(top: -16, left: -14, child: Doodle(size: 22)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ReviewBubble(
-              tilt: BubbleTilt.left,
-              child: Text(d.highlights![2]),
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       );
     }
     if (d.categories != null) {
       // Разброс по разным точкам "холста" фиксированной высоты — карточки
-      // покрупнее плюс декоративные эмодзи в промежутках, как в референсе.
+      // в стиле референса (белая плашка, цветная иконка-аватар, число мест).
       return SizedBox(
         width: double.infinity,
-        height: 330,
+        height: wallHeight,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -304,45 +334,49 @@ class _OnboardingPageState extends State<_OnboardingPage>
               ),
             ),
             const Align(
-                alignment: Alignment(0.2, -0.95), child: _EmojiDoodle('☕')),
+                alignment: Alignment(0.4, -0.15), child: Doodle(size: 22)),
             const Align(
-                alignment: Alignment(-0.15, 0.1), child: _EmojiDoodle('🎡')),
-            const Align(
-                alignment: Alignment(0.25, 0.6), child: _EmojiDoodle('🍽️')),
+                alignment: Alignment(-0.4, 0.65),
+                child: Doodle(glyph: '~', size: 20, rotateDeg: 0)),
           ],
         ),
       );
     }
     if (d.reviews != null) {
-      return Column(
-        children: d.reviews!.asMap().entries.map((entry) {
-          final i = entry.key;
-          final r = entry.value;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Align(
-              alignment: i.isEven ? Alignment.centerLeft : Alignment.centerRight,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ReviewBubble(
-                    hero: i == 0,
-                    tilt: i.isEven ? BubbleTilt.left : BubbleTilt.right,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
-                      child: Text('«${r.quote}»'),
+      final ys = _scatterYs(d.reviews!.length);
+      return SizedBox(
+        width: double.infinity,
+        height: wallHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (final entry in d.reviews!.asMap().entries)
+              Align(
+                alignment:
+                    Alignment(entry.key.isEven ? -0.92 : 0.92, ys[entry.key]),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ReviewBubble(
+                      hero: entry.key == 0,
+                      tilt: entry.key.isEven
+                          ? BubbleTilt.left
+                          : BubbleTilt.right,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 230),
+                        child: Text('«${entry.value.quote}»'),
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    top: -10,
-                    right: -6,
-                    child: BubbleRatingBadge(stars: r.stars),
-                  ),
-                ],
+                    Positioned(
+                      top: -10,
+                      right: -6,
+                      child: BubbleRatingBadge(stars: entry.value.stars),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }).toList(),
+          ],
+        ),
       );
     }
     return const SizedBox.shrink();
@@ -356,10 +390,15 @@ class _OnboardingPageState extends State<_OnboardingPage>
 
     // LayoutBuilder + minHeight (вместо Spacer/фиксированной высоты пузырей) —
     // заголовок прижимается к низу, когда контент короткий, но если перевод
-    // длиннее или пузыри с отзывами не влезли в 210px, страница просто
-    // скроллится, а не вылезает за границы (было падение "overflowed by …").
+    // длиннее или пузыри не влезли — страница просто скроллится, а не
+    // вылезает за границы (было падение "overflowed by …"). Высота "холста"
+    // считается от доступного места, чтобы пузыри/карточки заполняли экран,
+    // а не жались друг к другу внизу.
     return LayoutBuilder(
       builder: (context, constraints) {
+        final wallHeight = d.categories != null
+            ? 330.0
+            : (constraints.maxHeight * 0.56).clamp(360.0, 620.0);
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: ConstrainedBox(
@@ -368,7 +407,7 @@ class _OnboardingPageState extends State<_OnboardingPage>
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _staggered(_bubbleWall(context), startAt: 0.0),
+                _staggered(_bubbleWall(context, wallHeight), startAt: 0.0),
                 const SizedBox(height: 28),
                 _staggered(
                   RichText(
@@ -399,49 +438,53 @@ class _OnboardingPageState extends State<_OnboardingPage>
   }
 }
 
+/// Карточка категории в стиле референса: белая плашка с коралловой
+/// обводкой (как ReviewBubble), сверху — цветной квадрат-аватар с первой
+/// буквой категории, ниже — название и (если уже подгрузилось) число мест.
 class _CategoryTagBubble extends StatelessWidget {
   final _CategoryChip chip;
   const _CategoryTagBubble({required this.chip});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      width: 108,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1817) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.primary, width: 2.5),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(chip.icon, color: theme.colorScheme.primary, size: 34),
-          const SizedBox(height: 8),
-          Text(s(context).categoryPlural(chip.categoryKey),
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
-              textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-}
-
-/// Декоративный эмодзи, разбросанный по "холсту" 2-го экрана — чисто
-/// орнамент, как рукописные завитки в референсе, никакого смысла не несёт.
-class _EmojiDoodle extends StatelessWidget {
-  final String emoji;
-  const _EmojiDoodle(this.emoji);
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Opacity(
-        opacity: 0.8,
-        child: Text(emoji, style: const TextStyle(fontSize: 30)),
+    final label = s(context).categoryPlural(chip.categoryKey);
+    final color = AppColors.categoryColor(chip.categoryKey);
+    return ReviewBubble(
+      hero: true,
+      tilt: BubbleTilt.none,
+      child: SizedBox(
+        width: 118,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration:
+                  BoxDecoration(color: color, borderRadius: BorderRadius.circular(11)),
+              child: Text(
+                label.isNotEmpty ? label[0].toUpperCase() : '?',
+                style: GoogleFonts.unbounded(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(label,
+                style: GoogleFonts.montserrat(
+                    fontWeight: FontWeight.w800, fontSize: 15)),
+            if (chip.count != null) ...[
+              const SizedBox(height: 2),
+              Text(s(context).placesCount(chip.count!),
+                  style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
+                      color: Theme.of(context).textTheme.labelSmall?.color)),
+            ],
+          ],
+        ),
       ),
     );
   }

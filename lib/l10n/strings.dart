@@ -503,6 +503,11 @@ class Strings {
   // Онбординг (onboarding_screen.dart)
   // ---------------------------------------------------------------
   String get skip => _t('Пропустить', 'Oʻtkazib yuborish');
+  String stepLabel(int current, int total) {
+    final c = current.toString().padLeft(2, '0');
+    final t = total.toString().padLeft(2, '0');
+    return _t('ШАГ $c / $t', '$c-QADAM / $t');
+  }
   String get startButton => _t('Начать', 'Boshlash');
   String get alreadyHaveAccount =>
       _t('У меня уже есть аккаунт', 'Mening hisobim bor');
@@ -522,8 +527,9 @@ class Strings {
 
   String get onboard2TitlePrefix => _t('Выбирай ', 'Tanlang — ');
   String get onboard2TitleAccent => _t('по категориям', 'toifalar boʻyicha');
-  String get onboard2Subtitle => _t('Всё, что интересно именно тебе',
-      'Aynan sizga qiziqarli boʻlgan hamma narsa');
+  String get onboard2Subtitle => _t(
+      'Всё, что интересно именно тебе — от плова до тихих парков',
+      'Aynan sizga qiziqarli boʻlgan hamma narsa — palovdan tinch bogʻlargacha');
 
   String get onboard3TitlePrefix => _t('Доверяй ', 'Ishoning — ');
   String get onboard3TitleAccent =>
@@ -540,4 +546,6 @@ class Strings {
   String get onboardReview4 => _t(
       'Нашла столько новых мест благодаря приложению',
       'Ilova tufayli koʻplab yangi joylarni topdim');
+  String get onboardReview5 =>
+      _t('Наконец-то не ошиблась с выбором ресторана', 'Nihoyat restoranni togʻri tanladim');
 }

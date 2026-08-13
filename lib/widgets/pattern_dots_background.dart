@@ -51,7 +51,9 @@ class _DotsPainter extends CustomPainter {
 class Doodle extends StatelessWidget {
   final double size;
   final double rotateDeg;
-  const Doodle({super.key, this.size = 26, this.rotateDeg = -14});
+  final String glyph;
+  const Doodle(
+      {super.key, this.size = 26, this.rotateDeg = -14, this.glyph = 'e'});
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +65,7 @@ class Doodle extends StatelessWidget {
         child: Transform.rotate(
           angle: rotateDeg * 3.1415926535 / 180,
           child: Text(
-            'e',
+            glyph,
             style: GoogleFonts.jetBrainsMono(
               fontSize: size,
               height: 1,
