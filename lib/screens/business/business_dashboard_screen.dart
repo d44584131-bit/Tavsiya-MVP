@@ -118,6 +118,36 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
     }
   }
 
+  Future<bool> _editReviewReply(String replyId, String text) async {
+    try {
+      await SupabaseService.updateReviewReply(replyId: replyId, text: text);
+      if (mounted) _loadReviews();
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s(context).replySubmitError)));
+      return false;
+    }
+  }
+
+  Future<void> _toggleReviewHelpful(PlaceReviewData review, bool like) async {
+    setState(() {
+      _reviews = _reviews
+          .map((r) => r.id == review.id
+              ? r.copyWith(
+                  isHelpfulByMe: like,
+                  helpfulCount: review.helpfulCount + (like ? 1 : -1))
+              : r)
+          .toList();
+    });
+    try {
+      await SupabaseService.toggleReviewHelpful(review.id, like: like);
+    } catch (_) {
+      if (mounted) _loadReviews();
+    }
+  }
+
   Future<void> _editInfo() async {
     final updated = await Navigator.of(context).push<PlaceCardData>(
       MaterialPageRoute(
@@ -436,6 +466,8 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
       itemBuilder: (context, i) => PlaceReviewCard(
         data: _reviews[i],
         onSubmitReply: (text) => _submitReviewReply(_reviews[i], text),
+        onEditReply: (replyId, text) => _editReviewReply(replyId, text),
+        onToggleHelpful: (like) => _toggleReviewHelpful(_reviews[i], like),
       ),
     );
   }

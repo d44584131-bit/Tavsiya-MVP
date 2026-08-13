@@ -451,6 +451,7 @@ class Strings {
   String get signOutButton => _t('Выйти из аккаунта', 'Hisobdan chiqish');
   String get settingsTitle => _t('Настройки', 'Sozlamalar');
   String get accountSectionTitle => _t('Аккаунт', 'Hisob');
+  String get editReplyButton => _t('Изменить ответ', 'Javobni tahrirlash');
 
   // ---------------------------------------------------------------
   // Вход/регистрация (auth_screen.dart)

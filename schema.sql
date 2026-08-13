@@ -818,4 +818,61 @@ create trigger trg_helpful_votes_recalc_profile
 alter table public.places add column is_chain boolean not null default false;
 alter table public.places add column branches text[];
 
+-- =========================================================
+-- МИГРАЦИЯ: редактирование собственного ответа на отзыв
+-- =========================================================
+-- Раньше на review_replies были только insert/delete политики — заведение
+-- не могло поправить опечатку в уже опубликованном ответе, только удалить
+-- и написать заново (что рвёт created_at и историю уведомлений).
+
+create policy "review_replies_update_own" on public.review_replies
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- =========================================================
+-- МИГРАЦИЯ: уведомление заведению о новом опубликованном отзыве
+-- =========================================================
+-- Отзыв всегда создаётся как pending и становится видимым только когда
+-- модерация переводит его в approved (см. reviews.status default) —
+-- уведомляем владельца места именно на этот переход, а не на сам insert
+-- (иначе уведомление пришло бы раньше, чем отзыв реально опубликован).
+create or replace function public.notify_new_review()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_place_name text;
+  v_owner record;
+begin
+  if new.status <> 'approved' or old.status = 'approved' then
+    return new;
+  end if;
+
+  select name into v_place_name from public.places where id = new.place_id;
+
+  for v_owner in
+    select po.user_id, coalesce(pr.preferred_language, 'ru') as lang
+    from public.place_owners po
+    join public.profiles pr on pr.id = po.user_id
+    where po.place_id = new.place_id
+  loop
+    begin
+      insert into public.notifications (user_id, title, body)
+      values (
+        v_owner.user_id,
+        case when v_owner.lang = 'uz' then 'Yangi sharh' else 'Новый отзыв' end,
+        case when v_owner.lang = 'uz'
+          then '«' || v_place_name || '» uchun yangi sharh chop etildi'
+          else 'На «' || v_place_name || '» опубликован новый отзыв'
+        end
+      );
+    exception when others then
+      null;
+    end;
+  end loop;
+  return new;
+end;
+$$;
+
+create trigger trg_notify_new_review
+  after update of status on public.reviews
+  for each row execute function public.notify_new_review();
+
 alter table public.reviews add column branch_address text;

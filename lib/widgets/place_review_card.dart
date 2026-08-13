@@ -96,8 +96,16 @@ class PlaceReviewCard extends StatefulWidget {
   // отзывы" на главной): кнопки скрываются, счётчик лайков просто виден.
   final ValueChanged<bool>? onToggleHelpful;
   final Future<bool> Function(String text)? onSubmitReply;
+  // Правка уже существующего ответа заведения — если задан и у отзыва уже
+  // есть ответ владельца, кнопка "Ответить" превращается в "Изменить ответ"
+  // и поле подставляется текстом текущего ответа вместо пустого.
+  final Future<bool> Function(String replyId, String text)? onEditReply;
   const PlaceReviewCard(
-      {super.key, required this.data, this.onToggleHelpful, this.onSubmitReply});
+      {super.key,
+      required this.data,
+      this.onToggleHelpful,
+      this.onSubmitReply,
+      this.onEditReply});
 
   @override
   State<PlaceReviewCard> createState() => _PlaceReviewCardState();
@@ -117,13 +125,34 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
   static String _formatDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
 
+  ReviewReplyData? get _ownerReply {
+    for (final r in widget.data.replies) {
+      if (r.isOwnerReply) return r;
+    }
+    return null;
+  }
+
+  void _toggleReplyBox() {
+    final owner = _ownerReply;
+    if (!_showReplyBox && owner != null && widget.onEditReply != null) {
+      _replyController.text = owner.text;
+    }
+    setState(() => _showReplyBox = !_showReplyBox);
+  }
+
   Future<void> _submitReply() async {
     final text = _replyController.text.trim();
-    if (text.isEmpty || widget.onSubmitReply == null || _isSubmittingReply) {
-      return;
-    }
+    if (text.isEmpty || _isSubmittingReply) return;
+    final owner = _ownerReply;
+    final bool ok;
     setState(() => _isSubmittingReply = true);
-    final ok = await widget.onSubmitReply!(text);
+    if (owner != null && widget.onEditReply != null) {
+      ok = await widget.onEditReply!(owner.id, text);
+    } else if (widget.onSubmitReply != null) {
+      ok = await widget.onSubmitReply!(text);
+    } else {
+      ok = false;
+    }
     if (!mounted) return;
     setState(() => _isSubmittingReply = false);
     if (ok) {
@@ -403,12 +432,14 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
                 const SizedBox(width: 8),
                 InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: () =>
-                      setState(() => _showReplyBox = !_showReplyBox),
+                  onTap: _toggleReplyBox,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 4),
-                    child: Text(s(context).replyButton,
+                    child: Text(
+                        _ownerReply != null && widget.onEditReply != null
+                            ? s(context).editReplyButton
+                            : s(context).replyButton,
                         style: theme.textTheme.labelMedium?.copyWith(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.w600)),

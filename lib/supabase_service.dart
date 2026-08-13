@@ -14,6 +14,18 @@ import 'widgets/notification_tile.dart';
 import 'widgets/place_card.dart';
 import 'widgets/place_review_card.dart';
 
+/// Сводка по отзывам одного места для владельца — сколько всего, средний
+/// рейтинг, сколько ещё без ответа заведения.
+class OwnedPlaceReviewStats {
+  final int reviewsCount;
+  final double avgRating;
+  final int unansweredCount;
+  const OwnedPlaceReviewStats(
+      {required this.reviewsCount,
+      required this.avgRating,
+      required this.unansweredCount});
+}
+
 /// Единая точка доступа к Supabase. Инициализируется один раз в main()
 /// до runApp(): `await SupabaseService.init(url: ..., publishableKey: ...);`
 /// url — базовый URL проекта (https://<project>.supabase.co), без /rest/v1.
@@ -283,6 +295,41 @@ class SupabaseService {
         .whereType<Map<String, dynamic>>()
         .map(_placeFromRow)
         .toList();
+  }
+
+  /// Число отзывов / средний рейтинг / сколько без ответа заведения —
+  /// по каждому из переданных мест, одним запросом. Используется в шапке
+  /// "Мои заведения" (сводка) и бейджем "N без ответа" на карточке места.
+  static Future<Map<String, OwnedPlaceReviewStats>> fetchOwnedPlacesReviewStats(
+      List<String> placeIds) async {
+    if (placeIds.isEmpty) return {};
+    final rows = await _client
+        .from('reviews')
+        .select('place_id, rating, review_replies(is_owner_reply)')
+        .inFilter('place_id', placeIds)
+        .eq('status', 'approved');
+
+    final byPlace = <String, List<Map<String, dynamic>>>{};
+    for (final r in (rows as List).cast<Map<String, dynamic>>()) {
+      byPlace.putIfAbsent(r['place_id'] as String, () => []).add(r);
+    }
+
+    return byPlace.map((placeId, reviews) {
+      final total = reviews.length;
+      final avg = total == 0
+          ? 0.0
+          : reviews.map((r) => (r['rating'] as num).toDouble()).reduce((a, b) => a + b) /
+              total;
+      final unanswered = reviews.where((r) {
+        final replies = r['review_replies'] as List?;
+        return replies == null ||
+            !replies.any((rr) => (rr as Map<String, dynamic>)['is_owner_reply'] == true);
+      }).length;
+      return MapEntry(
+          placeId,
+          OwnedPlaceReviewStats(
+              reviewsCount: total, avgRating: avg, unansweredCount: unanswered));
+    });
   }
 
   /// Полная форма создания места владельцем ("Заведение" → "Добавить
@@ -718,6 +765,14 @@ class SupabaseService {
       'user_id': userId,
       'text': text,
     });
+  }
+
+  /// Правка уже опубликованного ответа (например, заведение поправляет
+  /// опечатку) — RLS review_replies_update_own разрешает менять только
+  /// свою же запись.
+  static Future<void> updateReviewReply(
+      {required String replyId, required String text}) async {
+    await _client.from('review_replies').update({'text': text}).eq('id', replyId);
   }
 
   // ------------------------------------------------------------
