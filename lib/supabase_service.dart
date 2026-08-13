@@ -98,7 +98,7 @@ class SupabaseService {
         .from('reviews')
         .select(
             'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, branch_address, '
-            'places(name), review_photos(storage_path), review_helpful_votes(user_id)')
+            'places(name, category), review_photos(storage_path), review_helpful_votes(user_id)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
@@ -108,6 +108,8 @@ class SupabaseService {
               authorName:
                   (r['places'] as Map<String, dynamic>?)?['name'] as String? ??
                       Strings(language).placeDeleted,
+              placeCategory:
+                  (r['places'] as Map<String, dynamic>?)?['category'] as String?,
               stars: r['rating'] as int,
               text: r['text'] as String,
               pros: r['pros'] as String?,
@@ -587,7 +589,7 @@ class SupabaseService {
         .from('reviews')
         .select(
             'id, rating, text, pros, cons, price_level, created_at, helpful_count, branch_address, '
-            'profiles!reviews_user_id_fkey(display_name, reviews_count), places(name), '
+            'profiles!reviews_user_id_fkey(display_name, reviews_count), places(name, category), '
             'review_photos(storage_path), review_helpful_votes(user_id)')
         .eq('status', 'approved')
         .order('created_at', ascending: false)
@@ -601,6 +603,7 @@ class SupabaseService {
         authorName: (profile?['display_name'] as String?) ??
             Strings(language).guestReviewer,
         placeName: (place?['name'] as String?) ?? '',
+        placeCategory: place?['category'] as String?,
         stars: r['rating'] as int,
         text: r['text'] as String,
         pros: r['pros'] as String?,
