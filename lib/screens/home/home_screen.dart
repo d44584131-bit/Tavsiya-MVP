@@ -43,14 +43,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _trendingPageSize = 10;
+  // На главной показываем только "витрину" из нескольких мест — весь
+  // остальной список (с постраничной подгрузкой) открывается по "Все"
+  // на PlaceListScreen, у неё своя независимая пагинация.
+  static const _trendingPreviewCount = 3;
 
   bool _isLoading = true;
   bool _hasError = false;
   List<PlaceCardData> _trending = const [];
-  bool _hasMoreTrending = true;
-  bool _isLoadingMoreTrending = false;
-  final _trendingScrollController = ScrollController();
   List<PlaceReviewData> _recentReviews = const [];
   List<CollectionData> _collections = const [];
   Map<String, int> _categoryCounts = const {};
@@ -62,14 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _trendingScrollController.addListener(_onTrendingScroll);
     _load();
-  }
-
-  @override
-  void dispose() {
-    _trendingScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -79,16 +72,14 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final results = await Future.wait([
-        SupabaseService.fetchTrendingPlaces(limit: _trendingPageSize),
+        SupabaseService.fetchTrendingPlaces(limit: _trendingPreviewCount),
         SupabaseService.fetchRecentReviews(language: widget.language),
         SupabaseService.fetchCollections(language: widget.language),
         SupabaseService.fetchCategoryCounts(),
       ]);
       if (!mounted) return;
-      final trending = results[0] as List<PlaceCardData>;
       setState(() {
-        _trending = trending;
-        _hasMoreTrending = trending.length == _trendingPageSize;
+        _trending = results[0] as List<PlaceCardData>;
         _recentReviews = results[1] as List<PlaceReviewData>;
         _collections = results[2] as List<CollectionData>;
         _categoryCounts = results[3] as Map<String, int>;
@@ -100,33 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasError = true;
         _isLoading = false;
       });
-    }
-  }
-
-  void _onTrendingScroll() {
-    if (!_hasMoreTrending || _isLoadingMoreTrending || _isLoading) return;
-    if (_trendingScrollController.position.pixels >
-        _trendingScrollController.position.maxScrollExtent - 300) {
-      _loadMoreTrending();
-    }
-  }
-
-  Future<void> _loadMoreTrending() async {
-    setState(() => _isLoadingMoreTrending = true);
-    try {
-      final more = await SupabaseService.fetchTrendingPlaces(
-        offset: _trending.length,
-        limit: _trendingPageSize,
-      );
-      if (!mounted) return;
-      setState(() {
-        _trending = [..._trending, ...more];
-        _hasMoreTrending = more.length == _trendingPageSize;
-        _isLoadingMoreTrending = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoadingMoreTrending = false);
     }
   }
 
@@ -341,46 +305,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTrendingRow() {
-    return SizedBox(
-      height: 150,
-      child: _isLoading
-          ? ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: 3,
-              itemBuilder: (context, i) => const PlaceCardSkeleton(),
-            )
-          : _trending.isEmpty
-              ? Center(
-                  child: Text(s(context).noPlacesYet,
-                      style: Theme.of(context).textTheme.bodyMedium),
-                )
-              : ListView.builder(
-                  controller: _trendingScrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: _trending.length + (_hasMoreTrending ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (i >= _trending.length) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 14),
-                        child: SizedBox(
-                          width: 32,
-                          child: Center(
-                              child: CircularProgressIndicator(strokeWidth: 2)),
-                        ),
-                      );
-                    }
-                    final place = _trending[i];
-                    return _StaggerIn(
-                      index: i,
-                      child: PlaceCard(
-                          data: place,
-                          tailRight: i.isOdd,
-                          onTap: () => widget.onPlaceTap?.call(place)),
-                    );
-                  },
-                ),
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            PlaceListTileSkeleton(),
+            PlaceListTileSkeleton(),
+            PlaceListTileSkeleton(),
+          ],
+        ),
+      );
+    }
+    if (_trending.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Center(
+          child: Text(s(context).noPlacesYet,
+              style: Theme.of(context).textTheme.bodyMedium),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: _trending.asMap().entries.map((entry) {
+          final place = entry.value;
+          return _StaggerIn(
+            index: entry.key,
+            child: PlaceListTile(
+                data: place, onTap: () => widget.onPlaceTap?.call(place)),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -408,6 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onDark: AppColors.categoryOnDark(c),
                 active: isActive,
                 onTap: () => _onCategoryTap(c),
+                centerContent: true,
               );
             }).toList(),
           ),

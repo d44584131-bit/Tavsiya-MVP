@@ -109,3 +109,44 @@ class PlaceListTile extends StatelessWidget {
     );
   }
 }
+
+/// Skeleton-версия PlaceListTile — используется, пока идёт загрузка данных.
+class PlaceListTileSkeleton extends StatefulWidget {
+  const PlaceListTileSkeleton({super.key});
+
+  @override
+  State<PlaceListTileSkeleton> createState() => _PlaceListTileSkeletonState();
+}
+
+class _PlaceListTileSkeletonState extends State<PlaceListTileSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final base = theme.dividerColor;
+        final shimmer = Color.lerp(base, theme.cardColor, _c.value)!;
+        return Container(
+          height: 130,
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: shimmer,
+            borderRadius: BorderRadius.circular(AppRadius.venue),
+          ),
+        );
+      },
+    );
+  }
+}
