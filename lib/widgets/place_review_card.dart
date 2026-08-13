@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
 import 'photo_viewer_screen.dart';
 import 'reviewer_level_badge.dart';
 
@@ -248,11 +250,12 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.accentOrange.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.tag),
                       ),
-                      child: Text(s(context).pendingBadge,
-                          style: const TextStyle(
-                              fontSize: 11,
+                      child: Text(s(context).pendingBadge.toUpperCase(),
+                          style: GoogleFonts.jetBrainsMono(
+                              fontSize: 10,
+                              letterSpacing: 0.5,
                               color: AppColors.accentOrange,
                               fontWeight: FontWeight.w600)),
                     ),
@@ -264,11 +267,12 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.negative.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.tag),
                       ),
-                      child: Text(s(context).rejectedBadge,
-                          style: const TextStyle(
-                              fontSize: 11,
+                      child: Text(s(context).rejectedBadge.toUpperCase(),
+                          style: GoogleFonts.jetBrainsMono(
+                              fontSize: 10,
+                              letterSpacing: 0.5,
                               color: AppColors.negative,
                               fontWeight: FontWeight.w600)),
                     ),
@@ -476,11 +480,12 @@ class _ReplyTile extends StatelessWidget {
                       horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppRadius.tag),
                   ),
-                  child: Text(s(context).ownerReplyBadge,
-                      style: TextStyle(
-                          fontSize: 10,
+                  child: Text(s(context).ownerReplyBadge.toUpperCase(),
+                      style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9,
+                          letterSpacing: 0.5,
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.primary)),
                 ),

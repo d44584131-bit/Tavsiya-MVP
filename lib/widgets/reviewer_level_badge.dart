@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../l10n/strings.dart';
 import '../services/reviewer_level.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
 
 /// Компактный значок уровня автора отзыва (Эксперт/Гуру) — та же логика,
 /// что и бейдж в профиле (reviewer_level.dart), но без "Вы", т.к. речь о
@@ -19,15 +21,16 @@ class ReviewerLevelBadge extends StatelessWidget {
         ? s(context).levelGuru
         : s(context).levelExpert;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.accentOrange.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadius.tag),
       ),
-      child: Text(label,
-          style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+      child: Text(label.toUpperCase(),
+          style: GoogleFonts.jetBrainsMono(
+              fontSize: 9,
+              letterSpacing: 0.5,
+              fontWeight: FontWeight.w600,
               color: AppColors.accentOrange)),
     );
   }

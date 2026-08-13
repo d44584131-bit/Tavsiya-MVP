@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
 
@@ -114,10 +115,11 @@ class PlaceCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        s(context).categoryLabel(data.category),
-                        style: const TextStyle(
+                        s(context).categoryLabel(data.category).toUpperCase(),
+                        style: GoogleFonts.jetBrainsMono(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 10,
+                            letterSpacing: 0.6,
                             fontWeight: FontWeight.w600),
                       ),
                     ),

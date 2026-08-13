@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_dimens.dart';
 
 class ChipSelector extends StatelessWidget {
   final String label;
@@ -29,31 +31,32 @@ class ChipSelector extends StatelessWidget {
             final isActive = o == selected;
             return Material(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.tag),
               child: InkWell(
                 onTap: () => onSelected(o),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.tag),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                   decoration: BoxDecoration(
                     color:
                         isActive ? theme.colorScheme.primary : theme.cardColor,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadius.tag),
                     border: Border.all(
                         color: isActive
                             ? theme.colorScheme.primary
                             : theme.dividerColor),
                   ),
                   child: Text(
-                    o,
-                    style: TextStyle(
+                    o.toUpperCase(),
+                    style: GoogleFonts.jetBrainsMono(
                       color: isActive
                           ? Colors.white
                           : theme.textTheme.bodyLarge?.color,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),

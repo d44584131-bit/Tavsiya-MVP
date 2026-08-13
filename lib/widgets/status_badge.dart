@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_dimens.dart';
 
 class StatusBadge extends StatelessWidget {
   final String statusLabel; // напр. "Вы эксперт"
@@ -23,7 +25,7 @@ class StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.folder),
         border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
@@ -36,7 +38,7 @@ class StatusBadge extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.tag),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -44,10 +46,11 @@ class StatusBadge extends StatelessWidget {
                     const Icon(Icons.workspace_premium_rounded,
                         size: 14, color: Colors.white),
                     const SizedBox(width: 4),
-                    Text(statusLabel,
-                        style: const TextStyle(
+                    Text(statusLabel.toUpperCase(),
+                        style: GoogleFonts.jetBrainsMono(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: 11,
+                            letterSpacing: 0.5,
                             fontWeight: FontWeight.w600)),
                   ],
                 ),
