@@ -335,6 +335,8 @@ class Strings {
   // ---------------------------------------------------------------
   String get businessEntryButton =>
       _t('Войти как заведение', 'Muassasa sifatida kirish');
+  String get businessEntrySubtitle => _t(
+      'Отвечать на отзывы и вести страницу', 'Sharhlarga javob bering va sahifani yuriting');
   String get businessExitButton =>
       _t('Выйти из режима заведения', 'Muassasa rejimidan chiqish');
   String get businessListTitle => _t('Мои заведения', 'Mening muassasalarim');
@@ -397,12 +399,11 @@ class Strings {
   String get expertBadge => _t('Вы эксперт', 'Siz ekspertsiz');
   String get noviceBadge => _t('Новичок', 'Yangi');
   String get guruBadge => _t('Вы гуру', 'Siz gurusiz');
-  String toExpertLevel(int remaining) => _t(
-      'До уровня «Эксперт» — ещё $remaining отзывов',
-      '«Ekspert» darajasigacha yana $remaining ta sharh');
-  String toGuruLevel(int remaining) => _t(
-      'До уровня «Гуру» — ещё $remaining отзывов',
-      '«Guru» darajasigacha yana $remaining ta sharh');
+  String toLevelTitle(String levelName) =>
+      _t('До уровня «$levelName»', '«$levelName» darajasigacha');
+  String reviewsRemaining(int remaining) => _t(
+      'Ещё $remaining ${_ruPlural(remaining, 'отзыв', 'отзыва', 'отзывов')}',
+      'Yana $remaining ta sharh');
   String get maxLevelReached => _t('Максимальный уровень', 'Eng yuqori daraja');
   // Нейтральные лейблы уровня (без "Вы") — для значка автора на отзывах,
   // где речь о другом пользователе, а не о самом себе.
@@ -445,7 +446,11 @@ class Strings {
   String get themeDark => _t('Тёмная', 'Qorongʻi');
   String get feedbackButton =>
       _t('Жалобы и предложения', 'Shikoyat va takliflar');
+  String get feedbackSubtitle =>
+      _t('Ответим в течение двух дней', 'Ikki kun ichida javob beramiz');
   String get signOutButton => _t('Выйти из аккаунта', 'Hisobdan chiqish');
+  String get settingsTitle => _t('Настройки', 'Sozlamalar');
+  String get accountSectionTitle => _t('Аккаунт', 'Hisob');
 
   // ---------------------------------------------------------------
   // Вход/регистрация (auth_screen.dart)

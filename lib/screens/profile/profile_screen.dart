@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthState;
 import '../../l10n/strings.dart';
 import '../../services/reviewer_level.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/status_badge.dart';
+import '../../theme/app_dimens.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/place_list_tile.dart';
@@ -208,26 +210,36 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Свой заголовок с круглыми кнопками рисуем только когда профиль
+    // реально загружен — на состояниях загрузки/ошибки/выхода из аккаунта
+    // используем обычный AppBar, чтобы не дублировать три версии шапки.
+    final showCustomHeader = !_isSigningOut &&
+        SupabaseService.currentUser != null &&
+        !_isLoading &&
+        !_hasError &&
+        _profile != null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(s(context).profileTitle),
-        actions: [
-          if (SupabaseService.currentUser != null)
-            IconButton(
-              icon: Badge(
-                isLabelVisible: _unreadNotifications > 0,
-                label: Text('$_unreadNotifications'),
-                child: const Icon(Icons.notifications_outlined),
-              ),
-              onPressed: _openNotifications,
+      appBar: showCustomHeader
+          ? null
+          : AppBar(
+              title: Text(s(context).profileTitle),
+              actions: [
+                if (SupabaseService.currentUser != null)
+                  IconButton(
+                    icon: Badge(
+                      isLabelVisible: _unreadNotifications > 0,
+                      label: Text('$_unreadNotifications'),
+                      child: const Icon(Icons.notifications_outlined),
+                    ),
+                    onPressed: _openNotifications,
+                  ),
+                IconButton(
+                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: _openSettings),
+              ],
             ),
-          IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: _openSettings),
-        ],
-      ),
-      body: _buildBody(theme),
+      body: SafeArea(bottom: false, child: _buildBody(theme)),
     );
   }
 
@@ -266,75 +278,121 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     final profile = _profile!;
+    final level = reviewerLevelFor(profile.reviewsCount);
+    final handle =
+        '@${profile.displayName.toLowerCase().replaceAll(RegExp(r'\s+'), '')}';
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
-              CircleAvatar(
-                radius: 40,
-                backgroundColor:
-                    theme.colorScheme.primary.withValues(alpha: 0.15),
-                child: Text(
-                  profile.displayName.isNotEmpty
-                      ? profile.displayName[0].toUpperCase()
-                      : '?',
-                  style: theme.textTheme.headlineLarge
-                      ?.copyWith(color: theme.colorScheme.primary),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(profile.displayName, style: theme.textTheme.headlineMedium),
-              if (profile.bio != null) ...[
-                const SizedBox(height: 4),
-                Text(profile.bio!,
-                    style: theme.textTheme.bodyMedium,
-                    textAlign: TextAlign.center),
-              ],
-              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                      child: _CounterItem(
+                      child: Text(s(context).profileTitle,
+                          style: theme.textTheme.headlineLarge)),
+                  _RoundIconButton(
+                    icon: Icons.notifications_outlined,
+                    badgeCount: _unreadNotifications,
+                    onTap: _openNotifications,
+                  ),
+                  const SizedBox(width: 10),
+                  _RoundIconButton(
+                    icon: Icons.settings_outlined,
+                    onTap: _openSettings,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.field),
+                    ),
+                    child: Text(
+                      profile.displayName.isNotEmpty
+                          ? profile.displayName[0].toUpperCase()
+                          : '?',
+                      style: GoogleFonts.unbounded(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(profile.displayName,
+                            style: theme.textTheme.headlineMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(
+                            '$handle · ${s(context).cityLabel(SupabaseService.cityKey).toUpperCase()}',
+                            style: GoogleFonts.jetBrainsMono(
+                                fontSize: 11,
+                                letterSpacing: 0.4,
+                                color: theme.textTheme.labelSmall?.color)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (profile.bio != null) ...[
+                const SizedBox(height: 8),
+                Text(profile.bio!, style: theme.textTheme.bodyMedium),
+              ],
+              const SizedBox(height: 10),
+              _LevelPill(level: level),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                      child: _StatCard(
                           value: '${profile.reviewsCount}',
                           label: s(context).statReviews)),
+                  const SizedBox(width: 10),
                   Expanded(
-                      child: _CounterItem(
+                      child: _StatCard(
                           value: '${profile.helpfulVotesCount}',
                           label: s(context).usefulLabel)),
+                  const SizedBox(width: 10),
                   Expanded(
-                      child: _CounterItem(
+                      child: _StatCard(
                           value: '${profile.savedCount}',
                           label: s(context).savedLabel)),
+                  const SizedBox(width: 10),
                   Expanded(
-                      child: _CounterItem(
+                      child: _StatCard(
                           value: '${profile.followersCount}',
                           label: s(context).followersLabel)),
                 ],
               ),
-              if (profile.reviewsCount > 0) ...[
-                const SizedBox(height: 16),
-                _buildStatusBadge(profile),
-              ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
+              _DarkLevelCard(profile: profile, level: level),
             ],
           ),
         ),
-        TabBar(
+        _PillTabBar(
           controller: _tabController,
-          isScrollable: true,
-          labelColor: theme.colorScheme.primary,
-          unselectedLabelColor: theme.textTheme.bodyMedium?.color,
-          indicatorColor: theme.colorScheme.primary,
-          tabs: [
+          labels: [
             s(context).tabMyReviews,
             s(context).tabSaved,
             s(context).tabSubscriptions,
             s(context).tabDrafts,
-          ].map((t) => Tab(text: t)).toList(),
+          ],
         ),
+        const SizedBox(height: 8),
         Expanded(
           child: TabBarView(
             controller: _tabController,
@@ -352,31 +410,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
       ],
     );
-  }
-
-  /// Новичок (0–9 отзывов) → Эксперт (10–49) → Гуру (50+, максимум).
-  Widget _buildStatusBadge(MyProfileData profile) {
-    final count = profile.reviewsCount;
-    return switch (reviewerLevelFor(count)) {
-      ReviewerLevel.novice => StatusBadge(
-          statusLabel: s(context).noviceBadge,
-          currentPoints: count,
-          nextLevelPoints: 10,
-          nextLevelLabel: s(context).toExpertLevel(10 - count),
-        ),
-      ReviewerLevel.expert => StatusBadge(
-          statusLabel: s(context).expertBadge,
-          currentPoints: count,
-          nextLevelPoints: 50,
-          nextLevelLabel: s(context).toGuruLevel(50 - count),
-        ),
-      ReviewerLevel.guru => StatusBadge(
-          statusLabel: s(context).guruBadge,
-          currentPoints: count,
-          nextLevelPoints: count,
-          nextLevelLabel: s(context).maxLevelReached,
-        ),
-    };
   }
 
   Widget _buildMyReviewsTab(ThemeData theme) {
@@ -561,25 +594,275 @@ class _DraftTile extends StatelessWidget {
   }
 }
 
-class _CounterItem extends StatelessWidget {
-  final String value;
-  final String label;
-  const _CounterItem({required this.value, required this.label});
+/// Белая круглая кнопка-иконка в шапке (уведомления/настройки) — с
+/// красным бейджем непрочитанного, если [badgeCount] > 0.
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final int badgeCount;
+  final VoidCallback onTap;
+  const _RoundIconButton(
+      {required this.icon, required this.onTap, this.badgeCount = 0});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      children: [
-        Text(value, style: theme.textTheme.titleMedium),
-        Text(label, style: theme.textTheme.labelSmall),
-      ],
+    return Material(
+      color: theme.cardColor,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Badge(
+            isLabelVisible: badgeCount > 0,
+            label: Text('$badgeCount'),
+            child: Icon(icon, color: theme.textTheme.bodyLarge?.color),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Компактная моно-плашка уровня рецензента (НОВИЧОК/ЭКСПЕРТ/ГУРУ).
+class _LevelPill extends StatelessWidget {
+  final ReviewerLevel level;
+  const _LevelPill({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = switch (level) {
+      ReviewerLevel.novice => s(context).levelNovice,
+      ReviewerLevel.expert => s(context).levelExpert,
+      ReviewerLevel.guru => s(context).levelGuru,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary,
+        borderRadius: BorderRadius.circular(AppRadius.bubble),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.bolt_rounded, size: 13, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(label.toUpperCase(),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: Colors.white)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Белая карточка-счётчик в ряду статистики профиля.
+class _StatCard extends StatelessWidget {
+  final String value;
+  final String label;
+  const _StatCard({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(AppRadius.folder),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        children: [
+          Text(value,
+              style: GoogleFonts.unbounded(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: theme.textTheme.bodyLarge?.color)),
+          const SizedBox(height: 2),
+          Text(label.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 9,
+                  letterSpacing: 0.4,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textTheme.labelSmall?.color)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Тёмная карточка прогресса до следующего уровня — контрастный акцент
+/// на светлом фоне профиля, как в референсе.
+class _DarkLevelCard extends StatelessWidget {
+  final MyProfileData profile;
+  final ReviewerLevel level;
+  const _DarkLevelCard({required this.profile, required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = profile.reviewsCount;
+    final (label, target, nextLevelName) = switch (level) {
+      ReviewerLevel.novice => (s(context).levelNovice, 10, s(context).levelExpert),
+      ReviewerLevel.expert => (s(context).levelExpert, 50, s(context).levelGuru),
+      ReviewerLevel.guru => (s(context).levelGuru, count == 0 ? 1 : count, null),
+    };
+    final progress = target == 0 ? 1.0 : (count / target).clamp(0.0, 1.0);
+    final titleText = nextLevelName != null
+        ? s(context).toLevelTitle(nextLevelName)
+        : s(context).maxLevelReached;
+    final subtitleText = nextLevelName != null
+        ? s(context).reviewsRemaining(target - count)
+        : s(context).maxLevelReached;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111010),
+        borderRadius: BorderRadius.circular(AppRadius.folder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.accentOrange,
+                  borderRadius: BorderRadius.circular(AppRadius.bubble),
+                ),
+                child: Text(label.toUpperCase(),
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: Colors.white)),
+              ),
+              const Spacer(),
+              Text('$count / $target',
+                  style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accentOrange)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(titleText,
+              style: GoogleFonts.montserrat(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white)),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                backgroundColor: Colors.white.withValues(alpha: 0.12),
+                valueColor:
+                    const AlwaysStoppedAnimation(AppColors.accentOrange),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(subtitleText.toUpperCase(),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 10,
+                  letterSpacing: 0.4,
+                  color: Colors.white.withValues(alpha: 0.5))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Горизонтальный ряд табов-пилюль поверх TabController — тот же чёрный
+/// активный/белый неактивный стиль, что и фильтр-чипы на главной.
+class _PillTabBar extends StatefulWidget {
+  final TabController controller;
+  final List<String> labels;
+  const _PillTabBar({required this.controller, required this.labels});
+
+  @override
+  State<_PillTabBar> createState() => _PillTabBarState();
+}
+
+class _PillTabBarState extends State<_PillTabBar> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: widget.labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final active = widget.controller.index == i;
+          return Material(
+            color: active ? const Color(0xFF111010) : theme.cardColor,
+            borderRadius: BorderRadius.circular(AppRadius.bubble),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.bubble),
+              onTap: () => widget.controller.animateTo(i),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.bubble),
+                  border: active
+                      ? null
+                      : Border.all(color: theme.dividerColor),
+                ),
+                alignment: Alignment.center,
+                child: Text(widget.labels[i],
+                    style: GoogleFonts.montserrat(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: active
+                            ? Colors.white
+                            : theme.textTheme.bodyLarge?.color)),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
 /// Нижний лист настроек: язык интерфейса, тема (day/night/системная) и выход из аккаунта.
-class _SettingsSheet extends StatelessWidget {
+class _SettingsSheet extends StatefulWidget {
   final AppLanguage language;
   final AppThemeMode themeMode;
   final ValueChanged<AppLanguage> onLanguageChanged;
@@ -599,6 +882,31 @@ class _SettingsSheet extends StatelessWidget {
     required this.onFeedback,
     required this.onBusiness,
   });
+
+  @override
+  State<_SettingsSheet> createState() => _SettingsSheetState();
+}
+
+class _SettingsSheetState extends State<_SettingsSheet> {
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _version = info.version);
+    }).catchError((_) {});
+  }
+
+  Widget _sectionLabel(BuildContext context, String text) {
+    final theme = Theme.of(context);
+    return Text(text.toUpperCase(),
+        style: GoogleFonts.jetBrainsMono(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+            color: theme.textTheme.labelSmall?.color));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -629,52 +937,65 @@ class _SettingsSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-              Text(s(context).languageSectionTitle,
-                  style: theme.textTheme.titleMedium),
-              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                      child: Text(s(context).settingsTitle,
+                          style: theme.textTheme.headlineMedium)),
+                  if (_version != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('v $_version',
+                          style: GoogleFonts.jetBrainsMono(
+                              fontSize: 11,
+                              color: theme.textTheme.labelSmall?.color)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _sectionLabel(context, s(context).languageSectionTitle),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: _SegmentButton(
                       label: 'Русский',
-                      selected: language == AppLanguage.ru,
-                      onTap: () => onLanguageChanged(AppLanguage.ru),
+                      selected: widget.language == AppLanguage.ru,
+                      onTap: () => widget.onLanguageChanged(AppLanguage.ru),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _SegmentButton(
                       label: "O'zbekcha",
-                      selected: language == AppLanguage.uz,
-                      onTap: () => onLanguageChanged(AppLanguage.uz),
+                      selected: widget.language == AppLanguage.uz,
+                      onTap: () => widget.onLanguageChanged(AppLanguage.uz),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Text(s(context).themeSectionTitle,
-                  style: theme.textTheme.titleMedium),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
+              _sectionLabel(context, s(context).themeSectionTitle),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: _SegmentButton(
                       label: s(context).themeSystem,
-                      selected: themeMode == AppThemeMode.system,
-                      onTap: () => onThemeModeChanged(AppThemeMode.system),
+                      selected: widget.themeMode == AppThemeMode.system,
+                      onTap: () =>
+                          widget.onThemeModeChanged(AppThemeMode.system),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _SegmentButton(
                       label: s(context).themeLight,
                       icon: Icons.light_mode_rounded,
-                      selected: themeMode == AppThemeMode.light,
-                      onTap: () => onThemeModeChanged(AppThemeMode.light),
+                      selected: widget.themeMode == AppThemeMode.light,
+                      onTap: () =>
+                          widget.onThemeModeChanged(AppThemeMode.light),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -682,43 +1003,131 @@ class _SettingsSheet extends StatelessWidget {
                     child: _SegmentButton(
                       label: s(context).themeDark,
                       icon: Icons.dark_mode_rounded,
-                      selected: themeMode == AppThemeMode.dark,
-                      onTap: () => onThemeModeChanged(AppThemeMode.dark),
+                      selected: widget.themeMode == AppThemeMode.dark,
+                      onTap: () =>
+                          widget.onThemeModeChanged(AppThemeMode.dark),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              if (isSignedIn) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: onBusiness,
-                    icon: const Icon(Icons.storefront_outlined),
-                    label: Text(s(context).businessEntryButton),
-                  ),
+              _sectionLabel(context, s(context).accountSectionTitle),
+              const SizedBox(height: 8),
+              if (widget.isSignedIn) ...[
+                _AccountListItem(
+                  icon: Icons.storefront_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: s(context).businessEntryButton,
+                  subtitle: s(context).businessEntrySubtitle,
+                  onTap: widget.onBusiness,
                 ),
                 const SizedBox(height: 10),
               ],
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onFeedback,
-                  icon: const Icon(Icons.flag_outlined),
-                  label: Text(s(context).feedbackButton),
+              _AccountListItem(
+                icon: Icons.flag_outlined,
+                iconColor: AppColors.accentOrange,
+                title: s(context).feedbackButton,
+                subtitle: s(context).feedbackSubtitle,
+                onTap: widget.onFeedback,
+              ),
+              if (widget.isSignedIn) ...[
+                const SizedBox(height: 16),
+                Material(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(AppRadius.folder),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppRadius.folder),
+                    onTap: widget.onSignOut,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.folder),
+                        border: Border.all(color: theme.dividerColor),
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.logout_rounded,
+                              size: 18, color: AppColors.negative),
+                          const SizedBox(width: 8),
+                          Text(s(context).signOutButton,
+                              style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.negative)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Пункт списка "Аккаунт" — цветная иконка-квадрат + заголовок/подзаголовок + шеврон.
+class _AccountListItem extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _AccountListItem({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.cardColor,
+      borderRadius: BorderRadius.circular(AppRadius.folder),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.folder),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.folder),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(AppRadius.field),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.labelSmall),
+                  ],
                 ),
               ),
-              if (isSignedIn) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: onSignOut,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: Text(s(context).signOutButton),
-                  ),
-                ),
-              ],
+              Icon(Icons.chevron_right_rounded,
+                  color: theme.textTheme.labelSmall?.color),
             ],
           ),
         ),
