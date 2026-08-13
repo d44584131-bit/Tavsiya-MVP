@@ -72,14 +72,16 @@ class _BootstrapState extends State<_Bootstrap> {
     };
     SupabaseService.cityKey = prefs.getString(_prefsCityKey) ?? kDefaultCity;
 
-    // Первый запуск: онбординг → язык → город → (обязательная) регистрация.
-    // onboardingDone проставляется один раз, в конце этой цепочки (см.
-    // _finishFirstRun). Если флаг уже стоит, но сессии нет — при каждом
-    // холодном старте (в том числе после выхода из аккаунта) пользователь
-    // попадает на экран входа/регистрации, а не сразу в приложение.
+    // Первый запуск: язык → онбординг → город → (обязательная) регистрация.
+    // Язык выбирается первым, чтобы текст онбординга сразу шёл на нужном
+    // языке, а не переключался на полпути. onboardingDone проставляется
+    // один раз, в конце этой цепочки (см. _finishFirstRun). Если флаг уже
+    // стоит, но сессии нет — при каждом холодном старте (в том числе после
+    // выхода из аккаунта) пользователь попадает на экран входа/регистрации,
+    // а не сразу в приложение.
     final hasSession = SupabaseService.currentUser != null;
     final initialFlow = !onboardingDone
-        ? _Flow.onboarding
+        ? _Flow.language
         : (hasSession ? _Flow.main : _Flow.auth);
 
     if (!mounted) return;
@@ -176,14 +178,14 @@ class _TavsiyaAppState extends State<TavsiyaApp> {
         // с телефон — без этого интерфейс выглядит рассыпавшимся на wide-viewport.
         builder: (context, child) => _WideScreenFrame(child: child),
         home: switch (_flow) {
-          _Flow.onboarding => OnboardingScreen(
-              onFinish: () => setState(() => _flow = _Flow.language),
-            ),
           _Flow.language => LanguageSelectScreen(
               onSelected: (lang) {
                 _setLanguage(lang);
-                setState(() => _flow = _Flow.city);
+                setState(() => _flow = _Flow.onboarding);
               },
+            ),
+          _Flow.onboarding => OnboardingScreen(
+              onFinish: () => setState(() => _flow = _Flow.city),
             ),
           _Flow.city => RegionSelectScreen(
               initialCity: _city,

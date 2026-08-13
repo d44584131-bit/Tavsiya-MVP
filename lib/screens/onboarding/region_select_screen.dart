@@ -17,6 +17,29 @@ class RegionSelectScreen extends StatefulWidget {
 class _RegionSelectScreenState extends State<RegionSelectScreen> {
   late String _selected = widget.initialCity;
 
+  // Реальные данные пока только по Ташкенту — остальные города в списке
+  // "на будущее" (см. кл. коммент выше), поэтому вместо переключения на
+  // них просто извиняемся и оставляем выбранным Ташкент.
+  void _onCityTap(String key) {
+    if (key != kDefaultCity) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(s(context).onlyTashkentTitle),
+          content: Text(s(context).onlyTashkentMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(s(context).gotItButton),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    setState(() => _selected = key);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -49,7 +72,7 @@ class _RegionSelectScreenState extends State<RegionSelectScreen> {
                     color: Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                     child: InkWell(
-                      onTap: () => setState(() => _selected = key),
+                      onTap: () => _onCityTap(key),
                       borderRadius: BorderRadius.circular(20),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),

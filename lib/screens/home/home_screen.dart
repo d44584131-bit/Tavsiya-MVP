@@ -480,6 +480,28 @@ class _CityPickerSheet extends StatelessWidget {
   const _CityPickerSheet(
       {required this.selectedCity, required this.onSelected});
 
+  // Реальные данные пока только по Ташкенту — вместо переключения на
+  // остальные города из списка просто извиняемся.
+  void _onCityTap(BuildContext context, String key) {
+    if (key != kDefaultCity) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(s(context).onlyTashkentTitle),
+          content: Text(s(context).onlyTashkentMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(s(context).gotItButton),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    onSelected(key);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -508,7 +530,7 @@ class _CityPickerSheet extends StatelessWidget {
           ...kCityKeys.map((key) {
             final isActive = key == selectedCity;
             return InkWell(
-              onTap: () => onSelected(key),
+              onTap: () => _onCityTap(context, key),
               borderRadius: BorderRadius.circular(14),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),

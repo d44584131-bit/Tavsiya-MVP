@@ -67,6 +67,11 @@ class Strings {
   String get chooseCitySubtitle => _t(
       'Пока полноценно работает только Ташкент — остальные города появятся позже',
       'Hozircha faqat Toshkent uchun toʻliq maʼlumot bor — boshqa shaharlar keyinroq qoʻshiladi');
+  String get onlyTashkentTitle => _t('Пока только Ташкент', 'Hozircha faqat Toshkent');
+  String get onlyTashkentMessage => _t(
+      'Сейчас мы работаем только в Ташкенте, приносим извинения. Другие города подключим позже.',
+      'Hozircha biz faqat Toshkentda ishlaymiz, uzr soʻraymiz. Boshqa shaharlarni keyinroq qoʻshamiz.');
+  String get gotItButton => _t('Понятно', 'Tushunarli');
 
   // ---------------------------------------------------------------
   // Категории мест (badge — единственное число / фильтр — множественное)
@@ -512,6 +517,8 @@ class Strings {
       _t('Сотни проверенных мест', 'Yuzlab tekshirilgan joylar');
   String get onboard1Bubble2 =>
       _t('Рейтинги реальных людей', 'Haqiqiy odamlarning baholari');
+  String get onboard1Bubble3 =>
+      _t('Новые места каждую неделю', 'Har hafta yangi joylar');
 
   String get onboard2TitlePrefix => _t('Выбирай ', 'Tanlang — ');
   String get onboard2TitleAccent => _t('по категориям', 'toifalar boʻyicha');
@@ -528,4 +535,9 @@ class Strings {
       'Muhiti zoʻr, albatta qaytamiz');
   String get onboardReview2 => _t('Отличное место для семейного отдыха',
       'Oilaviy dam olish uchun ajoyib joy');
+  String get onboardReview3 =>
+      _t('Кофе тут просто топ, хожу каждый день', 'Qahvasi zoʻr, har kuni boraman');
+  String get onboardReview4 => _t(
+      'Нашла столько новых мест благодаря приложению',
+      'Ilova tufayli koʻplab yangi joylarni topdim');
 }

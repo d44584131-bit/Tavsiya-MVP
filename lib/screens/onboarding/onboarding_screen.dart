@@ -55,7 +55,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           titlePrefix: s(context).onboard1TitlePrefix,
           titleAccent: s(context).onboard1TitleAccent,
           subtitle: s(context).onboard1Subtitle,
-          highlights: [s(context).onboard1Bubble1, s(context).onboard1Bubble2],
+          highlights: [
+            s(context).onboard1Bubble1,
+            s(context).onboard1Bubble2,
+            s(context).onboard1Bubble3,
+          ],
         ),
         OnboardingPageData(
           titlePrefix: s(context).onboard2TitlePrefix,
@@ -75,6 +79,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           reviews: [
             _ReviewSnippet(s(context).onboardReview1, 5),
             _ReviewSnippet(s(context).onboardReview2, 4),
+            _ReviewSnippet(s(context).onboardReview3, 5),
+            _ReviewSnippet(s(context).onboardReview4, 5),
           ],
         ),
       ];
@@ -222,8 +228,11 @@ class _OnboardingPageState extends State<_OnboardingPage>
   Widget _bubbleWall(BuildContext context) {
     final d = widget.data;
     if (d.highlights != null) {
-      return Stack(
-        clipBehavior: Clip.none,
+      // Колонка, а не Stack с абсолютным позиционированием — иначе высота
+      // "стены" не учитывает второй пузырь, и он наезжает на заголовок ниже
+      // (был баг с наложением элементов друг на друга).
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Align(
             alignment: Alignment.centerLeft,
@@ -232,31 +241,76 @@ class _OnboardingPageState extends State<_OnboardingPage>
               child: Text(d.highlights![0]),
             ),
           ),
-          Positioned(
-            top: 64,
-            right: 0,
-            child: ReviewBubble(
-              tilt: BubbleTilt.rightSoft,
-              child: Text(d.highlights![1]),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ReviewBubble(
+                  tilt: BubbleTilt.rightSoft,
+                  child: Text(d.highlights![1]),
+                ),
+                const Positioned(top: -16, left: -14, child: Doodle(size: 22)),
+              ],
             ),
           ),
-          const Positioned(top: 0, right: 40, child: Doodle(size: 24)),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ReviewBubble(
+              tilt: BubbleTilt.left,
+              child: Text(d.highlights![2]),
+            ),
+          ),
         ],
       );
     }
     if (d.categories != null) {
-      return Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 14,
-        runSpacing: 14,
-        children: d.categories!.asMap().entries.map((entry) {
-          final i = entry.key;
-          final chip = entry.value;
-          return Transform.rotate(
-            angle: (i.isEven ? -2.5 : 2.5) * 3.1415926535 / 180,
-            child: _CategoryTagBubble(chip: chip),
-          );
-        }).toList(),
+      // Разброс по разным точкам "холста" фиксированной высоты — карточки
+      // покрупнее плюс декоративные эмодзи в промежутках, как в референсе.
+      return SizedBox(
+        width: double.infinity,
+        height: 330,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Align(
+              alignment: const Alignment(-0.95, -0.95),
+              child: Transform.rotate(
+                angle: -6 * 3.1415926535 / 180,
+                child: _CategoryTagBubble(chip: d.categories![0]),
+              ),
+            ),
+            Align(
+              alignment: const Alignment(0.95, -0.5),
+              child: Transform.rotate(
+                angle: 5 * 3.1415926535 / 180,
+                child: _CategoryTagBubble(chip: d.categories![1]),
+              ),
+            ),
+            Align(
+              alignment: const Alignment(-0.85, 0.35),
+              child: Transform.rotate(
+                angle: -5 * 3.1415926535 / 180,
+                child: _CategoryTagBubble(chip: d.categories![2]),
+              ),
+            ),
+            Align(
+              alignment: const Alignment(0.9, 0.95),
+              child: Transform.rotate(
+                angle: 6 * 3.1415926535 / 180,
+                child: _CategoryTagBubble(chip: d.categories![3]),
+              ),
+            ),
+            const Align(
+                alignment: Alignment(0.2, -0.95), child: _EmojiDoodle('☕')),
+            const Align(
+                alignment: Alignment(-0.15, 0.1), child: _EmojiDoodle('🎡')),
+            const Align(
+                alignment: Alignment(0.25, 0.6), child: _EmojiDoodle('🍽️')),
+          ],
+        ),
       );
     }
     if (d.reviews != null) {
@@ -354,20 +408,40 @@ class _CategoryTagBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: 108,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1A1817) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.primary, width: 2),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.primary, width: 2.5),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(chip.icon, color: theme.colorScheme.primary, size: 26),
-          const SizedBox(height: 6),
+          Icon(chip.icon, color: theme.colorScheme.primary, size: 34),
+          const SizedBox(height: 8),
           Text(s(context).categoryPlural(chip.categoryKey),
-              style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w700, fontSize: 13),
+              textAlign: TextAlign.center),
         ],
+      ),
+    );
+  }
+}
+
+/// Декоративный эмодзи, разбросанный по "холсту" 2-го экрана — чисто
+/// орнамент, как рукописные завитки в референсе, никакого смысла не несёт.
+class _EmojiDoodle extends StatelessWidget {
+  final String emoji;
+  const _EmojiDoodle(this.emoji);
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Opacity(
+        opacity: 0.8,
+        child: Text(emoji, style: const TextStyle(fontSize: 30)),
       ),
     );
   }
