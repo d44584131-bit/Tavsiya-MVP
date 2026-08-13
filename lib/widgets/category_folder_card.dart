@@ -34,31 +34,31 @@ class CategoryFolderCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.only(top: 16),
+          padding: const EdgeInsets.only(top: 18),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                left: 12,
-                top: -16,
+                left: 14,
+                top: -18,
                 child: Container(
-                  width: 64,
-                  height: 16,
+                  width: 70,
+                  height: 18,
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(8)),
+                        const BorderRadius.vertical(top: Radius.circular(9)),
                   ),
                 ),
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(13, 12, 13, 11),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                 decoration: BoxDecoration(
                   color: color,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   border: active
-                      ? Border.all(color: Colors.white, width: 2)
+                      ? Border.all(color: Colors.white, width: 2.5)
                       : null,
                 ),
                 child: Column(
@@ -66,16 +66,19 @@ class CategoryFolderCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.montserrat(
                             fontWeight: FontWeight.w800,
-                            fontSize: 15,
+                            fontSize: 18,
+                            height: 1.15,
                             color: strong)),
                     if (count != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(count!,
                           style: GoogleFonts.jetBrainsMono(
                               fontWeight: FontWeight.w600,
-                              fontSize: 11,
+                              fontSize: 12,
                               color: quiet)),
                     ],
                   ],

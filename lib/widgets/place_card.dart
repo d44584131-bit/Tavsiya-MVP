@@ -48,7 +48,7 @@ class PlaceCard extends StatelessWidget {
         : Colors.black.withValues(alpha: 0.6);
 
     return Container(
-      width: 208,
+      width: 230,
       margin: const EdgeInsets.only(right: 12),
       child: Material(
         color: color,
@@ -64,7 +64,7 @@ class PlaceCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -78,7 +78,7 @@ class PlaceCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.montserrat(
                               fontWeight: FontWeight.w800,
-                              fontSize: 16,
+                              fontSize: 18,
                               height: 1.15,
                               color: strong)),
                       const SizedBox(height: 4),
@@ -87,15 +87,15 @@ class PlaceCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.montserrat(
                               fontWeight: FontWeight.w600,
-                              fontSize: 11,
+                              fontSize: 12,
                               color: quiet)),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   decoration: BoxDecoration(
                     color: const Color(0xFF111010),
                     borderRadius: BorderRadius.circular(10),
@@ -103,7 +103,7 @@ class PlaceCard extends StatelessWidget {
                   child: Text('★ ${data.rating.toStringAsFixed(1)}',
                       style: GoogleFonts.jetBrainsMono(
                           fontWeight: FontWeight.w700,
-                          fontSize: 11,
+                          fontSize: 12,
                           color: Colors.white)),
                 ),
               ],
@@ -144,8 +144,8 @@ class _PlaceCardSkeletonState extends State<PlaceCardSkeleton>
         final base = theme.dividerColor;
         final shimmer = Color.lerp(base, theme.cardColor, _c.value)!;
         return Container(
-          width: 208,
-          height: 82,
+          width: 230,
+          height: 96,
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
             color: shimmer,

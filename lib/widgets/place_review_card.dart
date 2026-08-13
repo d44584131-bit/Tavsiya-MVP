@@ -145,10 +145,10 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 18,
+                radius: 23,
                 backgroundColor:
                     theme.colorScheme.primary.withValues(alpha: 0.15),
                 child: Text(
@@ -157,10 +157,11 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
                       : '?',
                   style: TextStyle(
                       color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               // Expanded — чтобы имя всегда занимало ровно место до звёзд,
               // а не только свою фактическую ширину (иначе звёзды сдвигались
               // бы в зависимости от длины имени).

@@ -339,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTrendingRow() {
     return SizedBox(
-      height: 104,
+      height: 118,
       child: _isLoading
           ? ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -392,9 +392,9 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 2.1,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.55,
             children: _categories.map((c) {
               final isActive = _selectedCategory == c;
               return CategoryFolderCard(
@@ -445,17 +445,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCollectionsCarousel(ThemeData theme) {
     return SizedBox(
-      height: 78,
+      height: 112,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: _collections.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final collection = _collections[i];
           final category = _categories[i % _categories.length];
           return SizedBox(
-            width: 160,
+            width: 180,
             child: CategoryFolderCard(
               label: collection.title,
               color: AppColors.categoryColor(category),
