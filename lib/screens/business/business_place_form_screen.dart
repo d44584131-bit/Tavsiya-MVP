@@ -139,8 +139,11 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
 
   void _toggleChain(bool value) => setState(() {
         _isChain = value;
+        // При переходе "одиночная точка" -> "сеть" не теряем уже введённый
+        // адрес — подставляем его первым филиалом вместо пустого поля.
         if (value && _branchControllers.isEmpty) {
-          _branchControllers.add(TextEditingController());
+          _branchControllers.add(
+              TextEditingController(text: _addressController.text.trim()));
         }
       });
 
