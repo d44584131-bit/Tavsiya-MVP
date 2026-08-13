@@ -176,6 +176,22 @@ class SupabaseService {
   /// через setCity() из шапки главного экрана/онбординга.
   static String cityKey = kDefaultCity;
 
+  /// Число мест по каждой категории в выбранном городе — подпись под
+  /// карточкой категории на главной ("128 мест").
+  static Future<Map<String, int>> fetchCategoryCounts() async {
+    const categories = ['restaurant', 'cafe', 'park', 'mall'];
+    final counts = await Future.wait(categories.map((c) async {
+      final n = await _client
+          .from('places')
+          .count(CountOption.exact)
+          .eq('city', cityKey)
+          .eq('status', 'approved')
+          .eq('category', c);
+      return MapEntry(c, n);
+    }));
+    return Map.fromEntries(counts);
+  }
+
   /// "Сейчас популярно" — места с самым высоким рейтингом в выбранном городе.
   static Future<List<PlaceCardData>> fetchTrendingPlaces(
       {int limit = 10, int offset = 0}) async {

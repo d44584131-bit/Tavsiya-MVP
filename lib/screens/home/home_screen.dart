@@ -53,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _trendingScrollController = ScrollController();
   List<PlaceReviewData> _recentReviews = const [];
   List<CollectionData> _collections = const [];
+  Map<String, int> _categoryCounts = const {};
 
   String? _selectedCategory;
   bool _isFilterLoading = false;
@@ -81,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SupabaseService.fetchTrendingPlaces(limit: _trendingPageSize),
         SupabaseService.fetchRecentReviews(language: widget.language),
         SupabaseService.fetchCollections(language: widget.language),
+        SupabaseService.fetchCategoryCounts(),
       ]);
       if (!mounted) return;
       final trending = results[0] as List<PlaceCardData>;
@@ -89,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasMoreTrending = trending.length == _trendingPageSize;
         _recentReviews = results[1] as List<PlaceReviewData>;
         _collections = results[2] as List<CollectionData>;
+        _categoryCounts = results[3] as Map<String, int>;
         _isLoading = false;
       });
     } catch (_) {
@@ -397,8 +400,10 @@ class _HomeScreenState extends State<HomeScreen> {
             childAspectRatio: 1.55,
             children: _categories.map((c) {
               final isActive = _selectedCategory == c;
+              final count = _categoryCounts[c];
               return CategoryFolderCard(
                 label: s(context).categoryPlural(c),
+                count: count != null ? s(context).placesCount(count) : null,
                 color: AppColors.categoryColor(c),
                 onDark: AppColors.categoryOnDark(c),
                 active: isActive,
