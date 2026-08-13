@@ -507,6 +507,10 @@ class Strings {
   String get onboard1Subtitle => _t(
       'Рестораны, кафе, парки и торговые центры Ташкента — с честными отзывами настоящих людей',
       'Toshkentning restoran, kafe, parklari va savdo markazlari — real odamlarning halol sharhlari bilan');
+  String get onboard1Bubble1 =>
+      _t('Сотни проверенных мест', 'Yuzlab tekshirilgan joylar');
+  String get onboard1Bubble2 =>
+      _t('Рейтинги реальных людей', 'Haqiqiy odamlarning baholari');
 
   String get onboard2TitlePrefix => _t('Выбирай ', 'Tanlang — ');
   String get onboard2TitleAccent => _t('по категориям', 'toifalar boʻyicha');

@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
-import '../../theme/app_colors.dart';
 import '../../widgets/dot_indicator.dart';
+import '../../widgets/pattern_dots_background.dart';
+import '../../widgets/review_bubble.dart';
 import '../auth/auth_screen.dart';
 
 class OnboardingPageData {
   final String titlePrefix; // обычный текст
-  final String titleAccent; // акцентное слово (фиолетовым)
+  final String titleAccent; // акцентное слово (коралловым)
   final String subtitle;
-  final IconData illustrationIcon; // заглушка под полноэкранную иллюстрацию
-  final List<_CategoryChip>? categories; // только для 2-го экрана (сетка 4x2)
-  final List<_ReviewSnippet>? reviews; // короткие цитаты отзывов
+  final List<String>? highlights; // короткие акценты-пузыри (1-й экран)
+  final List<_CategoryChip>? categories; // только для 2-го экрана
+  final List<_ReviewSnippet>? reviews; // короткие цитаты отзывов (3-й экран)
 
   const OnboardingPageData({
     required this.titlePrefix,
     required this.titleAccent,
     required this.subtitle,
-    required this.illustrationIcon,
+    this.highlights,
     this.categories,
     this.reviews,
   });
@@ -54,13 +55,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           titlePrefix: s(context).onboard1TitlePrefix,
           titleAccent: s(context).onboard1TitleAccent,
           subtitle: s(context).onboard1Subtitle,
-          illustrationIcon: Icons.explore_outlined,
+          highlights: [s(context).onboard1Bubble1, s(context).onboard1Bubble2],
         ),
         OnboardingPageData(
           titlePrefix: s(context).onboard2TitlePrefix,
           titleAccent: s(context).onboard2TitleAccent,
           subtitle: s(context).onboard2Subtitle,
-          illustrationIcon: Icons.grid_view_rounded,
           categories: const [
             _CategoryChip('restaurant', Icons.restaurant_rounded),
             _CategoryChip('cafe', Icons.coffee_rounded),
@@ -72,7 +72,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           titlePrefix: s(context).onboard3TitlePrefix,
           titleAccent: s(context).onboard3TitleAccent,
           subtitle: s(context).onboard3Subtitle,
-          illustrationIcon: Icons.rate_review_rounded,
           reviews: [
             _ReviewSnippet(s(context).onboardReview1, 5),
             _ReviewSnippet(s(context).onboardReview2, 4),
@@ -103,66 +102,61 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final pages = _pages(context);
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: TextButton(
-                      onPressed: widget.onFinish,
-                      child: Text(
-                        s(context).skip,
-                        style: TextStyle(
-                            color:
-                                Theme.of(context).textTheme.bodyMedium?.color),
-                      ),
+      body: PatternDotsBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: TextButton(
+                    onPressed: widget.onFinish,
+                    child: Text(
+                      s(context).skip,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).textTheme.bodyMedium?.color),
                     ),
                   ),
                 ),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _controller,
-                    itemCount: pages.length,
-                    onPageChanged: (i) => setState(() => _index = i),
-                    itemBuilder: (context, i) =>
-                        _OnboardingPage(data: pages[i], isDark: isDark),
+              ),
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: pages.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (context, i) => _OnboardingPage(data: pages[i]),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: DotIndicator(count: pages.length, activeIndex: _index),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _next,
+                    child: Text(
+                        _isLast ? s(context).startButton : s(context).nextButton),
                   ),
                 ),
+              ),
+              if (!_isLast)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: DotIndicator(count: pages.length, activeIndex: _index),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _next,
-                      child: Text(_isLast
-                          ? s(context).startButton
-                          : s(context).nextButton),
-                    ),
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: TextButton(
+                    onPressed: _openLogin,
+                    child: Text(s(context).alreadyHaveAccount),
                   ),
                 ),
-                if (!_isLast)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: TextButton(
-                      onPressed: _openLogin,
-                      child: Text(s(context).alreadyHaveAccount),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -175,11 +169,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-/// Одна страница онбординга со stagger-анимацией появления элементов.
+/// Одна страница онбординга: стена наклонённых пузырей сверху, заголовок
+/// прижат к низу — со stagger-анимацией появления элементов.
 class _OnboardingPage extends StatefulWidget {
   final OnboardingPageData data;
-  final bool isDark;
-  const _OnboardingPage({required this.data, required this.isDark});
+  const _OnboardingPage({required this.data});
 
   @override
   State<_OnboardingPage> createState() => _OnboardingPageState();
@@ -225,38 +219,99 @@ class _OnboardingPageState extends State<_OnboardingPage>
     );
   }
 
+  Widget _bubbleWall(BuildContext context) {
+    final d = widget.data;
+    if (d.highlights != null) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ReviewBubble(
+              tilt: BubbleTilt.leftSoft,
+              child: Text(d.highlights![0]),
+            ),
+          ),
+          Positioned(
+            top: 64,
+            right: 0,
+            child: ReviewBubble(
+              tilt: BubbleTilt.rightSoft,
+              child: Text(d.highlights![1]),
+            ),
+          ),
+          const Positioned(top: 0, right: 40, child: Doodle(size: 24)),
+        ],
+      );
+    }
+    if (d.categories != null) {
+      return Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 14,
+        runSpacing: 14,
+        children: d.categories!.asMap().entries.map((entry) {
+          final i = entry.key;
+          final chip = entry.value;
+          return Transform.rotate(
+            angle: (i.isEven ? -2.5 : 2.5) * 3.1415926535 / 180,
+            child: _CategoryTagBubble(chip: chip),
+          );
+        }).toList(),
+      );
+    }
+    if (d.reviews != null) {
+      return Column(
+        children: d.reviews!.asMap().entries.map((entry) {
+          final i = entry.key;
+          final r = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Align(
+              alignment: i.isEven ? Alignment.centerLeft : Alignment.centerRight,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ReviewBubble(
+                    hero: i == 0,
+                    tilt: i.isEven ? BubbleTilt.left : BubbleTilt.right,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 240),
+                      child: Text('«${r.quote}»'),
+                    ),
+                  ),
+                  Positioned(
+                    top: -10,
+                    right: -6,
+                    child: BubbleRatingBadge(stars: r.stars),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = widget.data;
     final primary = Theme.of(context).colorScheme.primary;
     final textTheme = Theme.of(context).textTheme;
 
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
+          const SizedBox(height: 16),
           _staggered(
-            Container(
-              height: 220,
-              width: double.infinity,
-              margin: const EdgeInsets.only(top: 8, bottom: 24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors:
-                      AppColors.headerGradient('cafe', isDark: widget.isDark),
-                ),
-              ),
-              child: Icon(d.illustrationIcon,
-                  size: 96, color: Colors.white.withValues(alpha: 0.95)),
-            ),
+            SizedBox(height: 210, child: _bubbleWall(context)),
             startAt: 0.0,
           ),
+          const Spacer(),
           _staggered(
             RichText(
-              textAlign: TextAlign.center,
               text: TextSpan(
                 style: textTheme.headlineLarge,
                 children: [
@@ -270,99 +325,38 @@ class _OnboardingPageState extends State<_OnboardingPage>
           ),
           const SizedBox(height: 12),
           _staggered(
-            Text(d.subtitle,
-                textAlign: TextAlign.center, style: textTheme.bodyMedium),
+            Text(d.subtitle, style: textTheme.bodyMedium),
             startAt: 0.25,
           ),
-          const SizedBox(height: 24),
-          if (d.categories != null)
-            _staggered(
-              GridView.count(
-                crossAxisCount: 4,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.75,
-                children:
-                    d.categories!.map((c) => _CategoryCell(chip: c)).toList(),
-              ),
-              startAt: 0.35,
-            ),
-          if (d.reviews != null)
-            _staggered(
-              Column(
-                children:
-                    d.reviews!.map((r) => _ReviewCard(review: r)).toList(),
-              ),
-              startAt: 0.35,
-            ),
+          const SizedBox(height: 8),
         ],
       ),
     );
   }
 }
 
-class _CategoryCell extends StatelessWidget {
+class _CategoryTagBubble extends StatelessWidget {
   final _CategoryChip chip;
-  const _CategoryCell({required this.chip});
+  const _CategoryTagBubble({required this.chip});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      children: [
-        Container(
-          height: 56,
-          width: 56,
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: theme.dividerColor),
-          ),
-          child: Icon(chip.icon, color: theme.colorScheme.primary),
-        ),
-        const SizedBox(height: 6),
-        Text(s(context).categoryPlural(chip.categoryKey),
-            style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
-      ],
-    );
-  }
-}
-
-class _ReviewCard extends StatelessWidget {
-  final _ReviewSnippet review;
-  const _ReviewCard({required this.review});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: isDark ? const Color(0xFF1A1817) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        border: Border.all(color: theme.colorScheme.primary, width: 2),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: List.generate(
-              5,
-              (i) => Icon(
-                Icons.star_rounded,
-                size: 16,
-                color: i < review.stars
-                    ? AppColors.accentOrange
-                    : theme.dividerColor,
-              ),
-            ),
-          ),
+          Icon(chip.icon, color: theme.colorScheme.primary, size: 26),
           const SizedBox(height: 6),
-          Text('«${review.quote}»', style: theme.textTheme.bodyMedium),
+          Text(s(context).categoryPlural(chip.categoryKey),
+              style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
         ],
       ),
     );

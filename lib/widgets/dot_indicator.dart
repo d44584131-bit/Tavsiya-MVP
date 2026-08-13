@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Индикатор шагов (ProgressDots из бандла Ember): активная точка
+/// растягивается в капсулу, остальные — маленькие кружки.
 class DotIndicator extends StatelessWidget {
   final int count;
   final int activeIndex;
@@ -8,21 +10,22 @@ class DotIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final inactive = Theme.of(context).dividerColor;
+    final theme = Theme.of(context);
+    final active = theme.colorScheme.primary;
+    final idle = theme.dividerColor;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(count, (i) {
         final isActive = i == activeIndex;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 120),
           curve: Curves.easeOut,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 22 : 8,
+          margin: const EdgeInsets.symmetric(horizontal: 3.5),
+          width: isActive ? 26 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isActive ? primary : inactive,
-            borderRadius: BorderRadius.circular(4),
+            color: isActive ? active : idle,
+            borderRadius: BorderRadius.circular(isActive ? 5 : 999),
           ),
         );
       }),
