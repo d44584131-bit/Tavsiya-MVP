@@ -300,37 +300,47 @@ class _OnboardingPageState extends State<_OnboardingPage>
     final primary = Theme.of(context).colorScheme.primary;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          const SizedBox(height: 16),
-          _staggered(
-            SizedBox(height: 210, child: _bubbleWall(context)),
-            startAt: 0.0,
-          ),
-          const Spacer(),
-          _staggered(
-            RichText(
-              text: TextSpan(
-                style: textTheme.headlineLarge,
-                children: [
-                  TextSpan(text: d.titlePrefix),
-                  TextSpan(
-                      text: d.titleAccent, style: TextStyle(color: primary)),
-                ],
-              ),
+    // LayoutBuilder + minHeight (вместо Spacer/фиксированной высоты пузырей) —
+    // заголовок прижимается к низу, когда контент короткий, но если перевод
+    // длиннее или пузыри с отзывами не влезли в 210px, страница просто
+    // скроллится, а не вылезает за границы (было падение "overflowed by …").
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _staggered(_bubbleWall(context), startAt: 0.0),
+                const SizedBox(height: 28),
+                _staggered(
+                  RichText(
+                    text: TextSpan(
+                      style: textTheme.headlineLarge,
+                      children: [
+                        TextSpan(text: d.titlePrefix),
+                        TextSpan(
+                            text: d.titleAccent,
+                            style: TextStyle(color: primary)),
+                      ],
+                    ),
+                  ),
+                  startAt: 0.15,
+                ),
+                const SizedBox(height: 12),
+                _staggered(
+                  Text(d.subtitle, style: textTheme.bodyMedium),
+                  startAt: 0.25,
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-            startAt: 0.15,
           ),
-          const SizedBox(height: 12),
-          _staggered(
-            Text(d.subtitle, style: textTheme.bodyMedium),
-            startAt: 0.25,
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
+        );
+      },
     );
   }
 }

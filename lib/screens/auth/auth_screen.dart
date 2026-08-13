@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInput;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../l10n/strings.dart';
 import '../../supabase_service.dart';
@@ -88,6 +89,10 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passwordController.text,
         );
       }
+      // Запрос успешно прошёл валидацию сервера — сообщаем системе, что
+      // введённые логин/пароль можно предложить сохранить (диалог "Сохранить
+      // пароль?" от Google Password Manager / автозаполнения Android).
+      TextInput.finishAutofillContext();
       if (!mounted) return;
 
       // Закрытие/переход при успехе — через authStateChanges (см. initState),
@@ -197,27 +202,41 @@ class _AuthScreenState extends State<AuthScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              if (_isSignUp) ...[
-                _buildField(theme,
-                    controller: _nameController,
-                    hint: s(context).nameHint,
-                    icon: Icons.person_outline_rounded),
-                const SizedBox(height: 12),
-              ],
-              _buildField(
-                theme,
-                controller: _emailController,
-                hint: s(context).emailHint,
-                icon: Icons.mail_outline_rounded,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 12),
-              _buildField(
-                theme,
-                controller: _passwordController,
-                hint: s(context).passwordHint,
-                icon: Icons.lock_outline_rounded,
-                obscure: true,
+              AutofillGroup(
+                child: Column(
+                  children: [
+                    if (_isSignUp) ...[
+                      _buildField(theme,
+                          controller: _nameController,
+                          hint: s(context).nameHint,
+                          icon: Icons.person_outline_rounded,
+                          autofillHints: const [AutofillHints.name]),
+                      const SizedBox(height: 12),
+                    ],
+                    _buildField(
+                      theme,
+                      controller: _emailController,
+                      hint: s(context).emailHint,
+                      icon: Icons.mail_outline_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildField(
+                      theme,
+                      controller: _passwordController,
+                      hint: s(context).passwordHint,
+                      icon: Icons.lock_outline_rounded,
+                      obscure: true,
+                      autofillHints: [
+                        _isSignUp
+                            ? AutofillHints.newPassword
+                            : AutofillHints.password
+                      ],
+                      onSubmit: _canSubmit ? _submit : null,
+                    ),
+                  ],
+                ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
@@ -270,6 +289,8 @@ class _AuthScreenState extends State<AuthScreen> {
     required IconData icon,
     bool obscure = false,
     TextInputType? keyboardType,
+    List<String>? autofillHints,
+    VoidCallback? onSubmit,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -281,6 +302,10 @@ class _AuthScreenState extends State<AuthScreen> {
         controller: controller,
         obscureText: obscure,
         keyboardType: keyboardType,
+        autofillHints: autofillHints,
+        textInputAction:
+            onSubmit != null ? TextInputAction.done : TextInputAction.next,
+        onSubmitted: onSubmit != null ? (_) => onSubmit() : null,
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           border: InputBorder.none,
