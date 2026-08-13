@@ -38,6 +38,7 @@ class PlaceReviewData {
   final int helpfulCount; // лайки — переиспользует review_helpful_votes
   final bool isHelpfulByMe;
   final List<ReviewReplyData> replies;
+  final String? branchAddress; // выбранный филиал — только у сетей заведений
 
   const PlaceReviewData({
     required this.id,
@@ -55,6 +56,7 @@ class PlaceReviewData {
     this.helpfulCount = 0,
     this.isHelpfulByMe = false,
     this.replies = const [],
+    this.branchAddress,
   });
 
   PlaceReviewData copyWith({
@@ -78,6 +80,7 @@ class PlaceReviewData {
       helpfulCount: helpfulCount ?? this.helpfulCount,
       isHelpfulByMe: isHelpfulByMe ?? this.isHelpfulByMe,
       replies: replies ?? this.replies,
+      branchAddress: branchAddress,
     );
   }
 }
@@ -188,6 +191,33 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
                       const SizedBox(height: 2),
                       Text(_formatDate(data.createdAt!),
                           style: theme.textTheme.labelSmall),
+                    ],
+                    if (data.branchAddress != null) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: theme.dividerColor.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.storefront_outlined,
+                                size: 12,
+                                color: theme.textTheme.bodyMedium?.color),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '${s(context).branchBadgePrefix}: ${data.branchAddress}',
+                                style: theme.textTheme.labelSmall,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),

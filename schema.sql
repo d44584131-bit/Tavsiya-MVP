@@ -803,3 +803,19 @@ $$;
 create trigger trg_helpful_votes_recalc_profile
   after insert or delete on public.review_helpful_votes
   for each row execute function public.recalc_profile_helpful_votes_count();
+
+-- =========================================================
+-- МИГРАЦИЯ: сети заведений (несколько филиалов у одного профиля места)
+-- =========================================================
+-- Профиль места остаётся один на всю сеть; адреса филиалов хранятся
+-- массивом прямо на месте (places.branches), а не отдельной таблицей —
+-- филиалу не нужен собственный id, потому что отзыв просто запоминает
+-- выбранный адрес как текст (reviews.branch_address), а не ссылку на
+-- строку филиала. Это значит, что редактирование/удаление филиала не
+-- ломает уже оставленные отзывы — они хранят адрес таким, каким он был
+-- на момент публикации отзыва.
+
+alter table public.places add column is_chain boolean not null default false;
+alter table public.places add column branches text[];
+
+alter table public.reviews add column branch_address text;

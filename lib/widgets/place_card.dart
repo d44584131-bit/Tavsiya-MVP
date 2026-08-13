@@ -10,6 +10,8 @@ class PlaceCardData {
   final int reviewsCount;
   final String district;
   final String? status; // 'pending' | 'rejected' | null (= approved)
+  final bool isChain; // сеть заведений — несколько филиалов у одного профиля
+  final List<String> branches; // адреса филиалов, заполнено только у сетей
 
   const PlaceCardData({
     required this.id,
@@ -19,6 +21,8 @@ class PlaceCardData {
     required this.reviewsCount,
     required this.district,
     this.status,
+    this.isChain = false,
+    this.branches = const [],
   });
 }
 

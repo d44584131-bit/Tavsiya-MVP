@@ -27,6 +27,8 @@ class PlaceDetailData {
   final double rating;
   final int reviewsCount;
   final String? status; // 'pending' | 'rejected' | null (= approved)
+  final bool isChain; // сеть заведений — несколько филиалов у одного профиля
+  final List<String> branches; // адреса филиалов, заполнено только у сетей
 
   const PlaceDetailData({
     required this.id,
@@ -43,6 +45,8 @@ class PlaceDetailData {
     required this.rating,
     required this.reviewsCount,
     this.status,
+    this.isChain = false,
+    this.branches = const [],
   });
 
   static const _priceLevelLabels = {
@@ -698,12 +702,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
   }
 
   Widget _buildInfoTab(ThemeData theme, PlaceDetailData place) {
+    final addressValue = place.isChain && place.branches.isNotEmpty
+        ? place.branches.join('\n')
+        : place.address ?? s(context).notSpecified;
     final rows = [
-      (
-        Icons.place_rounded,
-        s(context).infoAddress,
-        place.address ?? s(context).notSpecified
-      ),
+      (Icons.place_rounded, s(context).infoAddress, addressValue),
       (
         Icons.phone_rounded,
         s(context).infoPhone,

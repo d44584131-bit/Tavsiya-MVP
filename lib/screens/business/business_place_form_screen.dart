@@ -40,6 +40,10 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
             offset: (text ?? _phoneCountryCode).length);
   final _websiteController = TextEditingController();
   final _instagramController = TextEditingController();
+  // Сеть заведений — один профиль, несколько адресов филиалов; хранится
+  // массивом на places.branches, без отдельной таблицы (см. schema.sql).
+  bool _isChain = false;
+  final List<TextEditingController> _branchControllers = [];
   String? _category;
   String? _priceLevel;
   double _rating = 0;
@@ -86,6 +90,10 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
               : phones.map((p) => _newPhoneController(p)));
         _websiteController.text = place.website ?? '';
         _instagramController.text = place.instagram ?? '';
+        _isChain = place.isChain;
+        _branchControllers
+          ..clear()
+          ..addAll(place.branches.map((b) => TextEditingController(text: b)));
         _category = place.category;
         _priceLevel = place.priceLevel;
         _rating = place.rating;
@@ -112,6 +120,9 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
     }
     _websiteController.dispose();
     _instagramController.dispose();
+    for (final c in _branchControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -124,6 +135,21 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
   void _removePhoneField(int index) => setState(() {
         _phoneControllers[index].dispose();
         _phoneControllers.removeAt(index);
+      });
+
+  void _toggleChain(bool value) => setState(() {
+        _isChain = value;
+        if (value && _branchControllers.isEmpty) {
+          _branchControllers.add(TextEditingController());
+        }
+      });
+
+  void _addBranchField() =>
+      setState(() => _branchControllers.add(TextEditingController()));
+
+  void _removeBranchField(int index) => setState(() {
+        _branchControllers[index].dispose();
+        _branchControllers.removeAt(index);
       });
 
   Future<void> _addPhoto() async {
@@ -176,6 +202,12 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
         .join(', ');
     final website = _websiteController.text.trim();
     final instagram = _instagramController.text.trim();
+    final branches = _isChain
+        ? _branchControllers
+            .map((c) => c.text.trim())
+            .where((b) => b.isNotEmpty)
+            .toList()
+        : const <String>[];
     try {
       if (_isEditing) {
         await SupabaseService.updateOwnedPlace(
@@ -188,6 +220,8 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
           website: website.isEmpty ? null : website,
           instagram: instagram.isEmpty ? null : instagram,
           priceLevel: _priceLevel,
+          isChain: _isChain,
+          branches: branches,
         );
         if (!mounted) return;
         Navigator.pop(
@@ -199,6 +233,8 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
             rating: _rating,
             reviewsCount: _reviewsCount,
             district: _district,
+            isChain: _isChain,
+            branches: branches,
           ),
         );
       } else {
@@ -211,6 +247,8 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
           website: website.isEmpty ? null : website,
           instagram: instagram.isEmpty ? null : instagram,
           priceLevel: _priceLevel,
+          isChain: _isChain,
+          branches: branches,
         );
         for (final bytes in _photoBytes) {
           try {
@@ -269,10 +307,45 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
                 const SizedBox(height: 8),
                 _buildField(theme, _descriptionController, maxLines: 3),
                 const SizedBox(height: 20),
-                Text(s(context).businessAddressLabel,
-                    style: theme.textTheme.titleMedium),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(s(context).businessAddressLabel,
+                          style: theme.textTheme.titleMedium),
+                    ),
+                    Text(s(context).businessChainToggleLabel,
+                        style: theme.textTheme.labelSmall),
+                    Switch(value: _isChain, onChanged: _toggleChain),
+                  ],
+                ),
                 const SizedBox(height: 8),
-                _buildField(theme, _addressController, maxLines: 1),
+                if (!_isChain)
+                  _buildField(theme, _addressController, maxLines: 1)
+                else ...[
+                  for (var i = 0; i < _branchControllers.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildField(theme, _branchControllers[i],
+                                maxLines: 1,
+                                hintText: s(context).branchAddressHint),
+                          ),
+                          if (_branchControllers.length > 1)
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => _removeBranchField(i),
+                            ),
+                        ],
+                      ),
+                    ),
+                  TextButton.icon(
+                    onPressed: _addBranchField,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(s(context).addBranchButton),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 Text(s(context).businessPhoneLabel,
                     style: theme.textTheme.titleMedium),
@@ -423,13 +496,14 @@ class _BusinessPlaceFormScreenState extends State<BusinessPlaceFormScreen> {
   }
 
   Widget _buildField(ThemeData theme, TextEditingController controller,
-      {required int maxLines, TextInputType? keyboardType}) {
+      {required int maxLines, TextInputType? keyboardType, String? hintText}) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
+        hintText: hintText,
         filled: true,
         fillColor: theme.cardColor,
         border: OutlineInputBorder(

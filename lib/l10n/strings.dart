@@ -347,6 +347,14 @@ class Strings {
   String get businessNameLabel => _t('Название', 'Nomi');
   String get businessDescriptionLabel => _t('Описание', 'Tavsif');
   String get businessAddressLabel => _t('Адрес', 'Manzil');
+  String get businessChainToggleLabel =>
+      _t('Сеть заведений (несколько адресов)', 'Tarmoq (bir nechta manzil)');
+  String get addBranchButton => _t('Добавить филиал', 'Filial qoʻshish');
+  String get branchAddressHint =>
+      _t('Адрес филиала', 'Filial manzili');
+  String get chooseBranchTitle =>
+      _t('На каком филиале был отзыв?', 'Qaysi filial haqida sharh?');
+  String get branchBadgePrefix => _t('Филиал', 'Filial');
   String get businessPhoneLabel => _t('Телефон', 'Telefon');
   String get addPhoneNumberButton =>
       _t('Добавить номер', 'Raqam qoʻshish');

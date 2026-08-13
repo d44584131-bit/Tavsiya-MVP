@@ -67,6 +67,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
 
   late int _step = _hasPreselection ? 1 : 0;
   PlaceCardData? _selectedExistingPlace;
+  String? _selectedBranch; // выбранный филиал — только для сетей заведений
   String? _newPlaceName;
   String? _newPlaceCategory;
   int _rating = 0;
@@ -215,6 +216,41 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   bool get _canProceedFromStep2 =>
       _rating > 0 && _textController.text.trim().length >= 10;
 
+  /// Для сети заведений отзыв обязательно привязывается к конкретному
+  /// филиалу — показываем выбор перед тем, как пустить дальше по форме.
+  /// Возвращает false, если пользователь закрыл выбор ничего не выбрав.
+  Future<bool> _ensureBranchSelected() async {
+    final place = _selectedExistingPlace;
+    if (place == null || !place.isChain || place.branches.isEmpty) {
+      return true;
+    }
+    if (_selectedBranch != null && place.branches.contains(_selectedBranch)) {
+      return true;
+    }
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(s(context).chooseBranchTitle,
+                  style: Theme.of(context).textTheme.titleMedium),
+            ),
+            ...place.branches.map((b) => ListTile(
+                  leading: const Icon(Icons.storefront_outlined),
+                  title: Text(b),
+                  onTap: () => Navigator.pop(context, b),
+                )),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || !mounted) return false;
+    setState(() => _selectedBranch = chosen);
+    return true;
+  }
+
   Future<void> _addPhoto() async {
     if (_photoBytes.length >= 6) return;
     final source = await showModalBottomSheet<ImageSource>(
@@ -280,6 +316,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         priceLevel: _priceChip,
         language: widget.language == AppLanguage.uz ? 'uz' : 'ru',
         photos: _photoBytes,
+        branchAddress: _selectedBranch,
       );
       if (_draftId != null) {
         try {
@@ -416,6 +453,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                         selected: _selectedExistingPlace?.id == p.id,
                         onTap: () => setState(() {
                           _selectedExistingPlace = p;
+                          _selectedBranch = null;
                           _newPlaceName = null;
                           _newPlaceCategory = null;
                         }),
@@ -428,6 +466,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                       onTap: () => setState(() {
                         _newPlaceName = query;
                         _selectedExistingPlace = null;
+                        _selectedBranch = null;
                       }),
                     ),
                   if (_newPlaceName != null) ...[
@@ -724,10 +763,13 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
                 child: ElevatedButton(
                   onPressed: !canProceed || _isSubmitting
                       ? null
-                      : () {
+                      : () async {
                           if (isLastEditableStep) {
                             _submit();
                           } else {
+                            if (_step == 0 && !await _ensureBranchSelected()) {
+                              return;
+                            }
                             _goTo(_step + 1);
                           }
                         },

@@ -74,7 +74,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, '
+            'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, branch_address, '
             'places(name), review_photos(storage_path), review_helpful_votes(user_id)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
@@ -96,6 +96,7 @@ class SupabaseService {
                   r['status'] == 'approved' ? null : r['status'] as String?,
               helpfulCount: r['helpful_count'] as int? ?? 0,
               isHelpfulByMe: _isHelpfulByMe(r, userId),
+              branchAddress: r['branch_address'] as String?,
             ))
         .toList();
   }
@@ -145,7 +146,7 @@ class SupabaseService {
   // ------------------------------------------------------------
 
   static const _placeCardColumns =
-      'id, name, category, district, rating_avg, reviews_count, status';
+      'id, name, category, district, rating_avg, reviews_count, status, is_chain, branches';
 
   /// Выбранный пользователем город — фильтрует "Сейчас популярно" и поиск.
   /// Загружается из SharedPreferences при старте (см. main.dart) и меняется
@@ -255,6 +256,8 @@ class SupabaseService {
     String? website,
     String? instagram,
     String? priceLevel,
+    bool isChain = false,
+    List<String> branches = const [],
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
@@ -272,6 +275,8 @@ class SupabaseService {
           'instagram': instagram,
           'price_level': priceLevel,
           'created_by': userId,
+          'is_chain': isChain,
+          'branches': isChain && branches.isNotEmpty ? branches : null,
         })
         .select(_placeCardColumns)
         .single();
@@ -297,6 +302,8 @@ class SupabaseService {
     String? website,
     String? instagram,
     String? priceLevel,
+    bool isChain = false,
+    List<String> branches = const [],
   }) async {
     await _client.from('places').update({
       'name': name,
@@ -307,6 +314,8 @@ class SupabaseService {
       'website': website,
       'instagram': instagram,
       'price_level': priceLevel,
+      'is_chain': isChain,
+      'branches': isChain && branches.isNotEmpty ? branches : null,
     }).eq('id', placeId);
   }
 
@@ -379,7 +388,7 @@ class SupabaseService {
         .from('places')
         .select(
           'id, name, category, description, address, district, phone, website, instagram, price_level, '
-          'is_verified, rating_avg, reviews_count, status',
+          'is_verified, rating_avg, reviews_count, status, is_chain, branches',
         )
         .eq('id', id)
         .single();
@@ -399,6 +408,8 @@ class SupabaseService {
       rating: (row['rating_avg'] as num).toDouble(),
       reviewsCount: row['reviews_count'] as int,
       status: row['status'] == 'approved' ? null : row['status'] as String?,
+      isChain: row['is_chain'] as bool? ?? false,
+      branches: _branchesFromRow(row),
     );
   }
 
@@ -411,7 +422,15 @@ class SupabaseService {
       reviewsCount: r['reviews_count'] as int,
       district: (r['district'] as String?) ?? '',
       status: r['status'] == 'approved' ? null : r['status'] as String?,
+      isChain: r['is_chain'] as bool? ?? false,
+      branches: _branchesFromRow(r),
     );
+  }
+
+  static List<String> _branchesFromRow(Map<String, dynamic> r) {
+    final raw = r['branches'] as List?;
+    if (raw == null) return const [];
+    return raw.map((b) => b as String).toList();
   }
 
   /// "Подборки для вас" на главном экране — курируемые списки мест.
@@ -457,7 +476,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, '
+            'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, branch_address, '
             'profiles!reviews_user_id_fkey(display_name, reviews_count), '
             'review_photos(storage_path), review_helpful_votes(user_id), '
             'review_replies(id, text, is_owner_reply, created_at, profiles!review_replies_user_id_fkey(display_name))')
@@ -485,6 +504,7 @@ class SupabaseService {
         helpfulCount: r['helpful_count'] as int? ?? 0,
         isHelpfulByMe: _isHelpfulByMe(r, userId),
         replies: _repliesFromRow(r, language),
+        branchAddress: r['branch_address'] as String?,
       );
     }).toList();
   }
@@ -527,7 +547,7 @@ class SupabaseService {
     final rows = await _client
         .from('reviews')
         .select(
-            'id, rating, text, pros, cons, price_level, created_at, helpful_count, '
+            'id, rating, text, pros, cons, price_level, created_at, helpful_count, branch_address, '
             'profiles!reviews_user_id_fkey(display_name, reviews_count), places(name), '
             'review_photos(storage_path), review_helpful_votes(user_id)')
         .eq('status', 'approved')
@@ -552,6 +572,7 @@ class SupabaseService {
         authorReviewsCount: profile?['reviews_count'] as int?,
         helpfulCount: r['helpful_count'] as int? ?? 0,
         isHelpfulByMe: _isHelpfulByMe(r, userId),
+        branchAddress: r['branch_address'] as String?,
       );
     }).toList();
   }
@@ -570,6 +591,7 @@ class SupabaseService {
     required String
         language, // 'ru' | 'uz' — метаданные, не влияет на видимость
     List<Uint8List> photos = const [],
+    String? branchAddress, // выбранный филиал — только для сетей заведений
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
@@ -589,6 +611,7 @@ class SupabaseService {
           'price_level': priceLevel,
           'language': language,
           'status': 'pending',
+          'branch_address': branchAddress,
         })
         .select('id')
         .single();
