@@ -55,10 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<CollectionData> _collections = const [];
   Map<String, int> _categoryCounts = const {};
 
-  String? _selectedCategory;
-  bool _isFilterLoading = false;
-  List<PlaceCardData> _filteredPlaces = const [];
-
   @override
   void initState() {
     super.initState();
@@ -94,25 +90,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _onCategoryTap(String key) async {
-    final next = _selectedCategory == key ? null : key;
-    setState(() => _selectedCategory = next);
-    if (next == null) {
-      setState(() => _filteredPlaces = const []);
-      return;
-    }
-    setState(() => _isFilterLoading = true);
-    try {
-      final results = await SupabaseService.searchPlaces(category: next);
-      if (!mounted) return;
-      setState(() {
-        _filteredPlaces = results;
-        _isFilterLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isFilterLoading = false);
-    }
+  void _openCategory(String key) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlaceListScreen(
+        title: s(context).categoryPlural(key),
+        fetcher: ({required offset, required limit}) =>
+            SupabaseService.searchPlaces(
+                category: key, offset: offset, limit: limit),
+        onPlaceTap: (p) => widget.onPlaceTap?.call(p),
+      ),
+    ));
   }
 
   void _openAllTrending() {
@@ -201,7 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SliverToBoxAdapter(child: _buildTrendingRow()),
           SliverToBoxAdapter(child: _buildCategoryFilterHeader(theme)),
-          if (_selectedCategory != null) _buildFilterResultsSliver(theme),
           if (!_isLoading && _collections.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: SectionHeader(
@@ -355,54 +341,24 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
             childAspectRatio: 1.55,
-            children: _categories.map((c) {
-              final isActive = _selectedCategory == c;
+            children: _categories.asMap().entries.map((entry) {
+              final c = entry.value;
               final count = _categoryCounts[c];
-              return CategoryFolderCard(
-                label: s(context).categoryPlural(c),
-                count: count != null ? s(context).placesCount(count) : null,
-                color: AppColors.categoryColor(c),
-                onDark: AppColors.categoryOnDark(c),
-                active: isActive,
-                onTap: () => _onCategoryTap(c),
-                centerContent: true,
+              return _StaggerIn(
+                index: entry.key,
+                child: CategoryFolderCard(
+                  label: s(context).categoryPlural(c),
+                  count: count != null ? s(context).placesCount(count) : null,
+                  color: AppColors.categoryColor(c),
+                  onDark: AppColors.categoryOnDark(c),
+                  onTap: () => _openCategory(c),
+                  centerContent: true,
+                ),
               );
             }).toList(),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildFilterResultsSliver(ThemeData theme) {
-    if (_isFilterLoading) {
-      return const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-    if (_filteredPlaces.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Center(
-              child: Text(s(context).categoryEmpty,
-                  style: theme.textTheme.bodyMedium)),
-        ),
-      );
-    }
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      sliver: SliverList.builder(
-        itemCount: _filteredPlaces.length,
-        itemBuilder: (context, i) {
-          final place = _filteredPlaces[i];
-          return PlaceListTile(
-              data: place, onTap: () => widget.onPlaceTap?.call(place));
-        },
-      ),
     );
   }
 

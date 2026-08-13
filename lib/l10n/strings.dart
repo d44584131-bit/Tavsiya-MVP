@@ -121,8 +121,6 @@ class Strings {
   String get searchHint => _t('Найти место…', 'Joy qidirish…');
   String get trendingTitle => _t('Сейчас популярно', 'Hozir mashhur');
   String get categoriesTitle => _t('Категории', 'Kategoriyalar');
-  String get categoryEmpty =>
-      _t('В этой категории пока пусто', 'Bu toifada hozircha boʻsh');
   String get recentReviewsTitle => _t('Новые отзывы', 'Yangi sharhlar');
   String get collectionsTitle => _t('Подборки для вас', 'Siz uchun tanlovlar');
   String get noPlacesYet => _t('Пока нет мест', 'Hozircha joylar yoʻq');

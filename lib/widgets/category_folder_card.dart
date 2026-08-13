@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// "Папка"-категория со сплошной заливкой и корешком сверху — как
 /// CategoryFolder в бандле Ember. [count] опционален (не выдумываем цифры,
 /// если реальных данных нет).
-class CategoryFolderCard extends StatelessWidget {
+class CategoryFolderCard extends StatefulWidget {
   final String label;
   final String? count;
   final Color color;
@@ -28,17 +28,48 @@ class CategoryFolderCard extends StatelessWidget {
   });
 
   @override
+  State<CategoryFolderCard> createState() => _CategoryFolderCardState();
+}
+
+class _CategoryFolderCardState extends State<CategoryFolderCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final label = widget.label;
+    final count = widget.count;
+    final color = widget.color;
+    final onDark = widget.onDark;
+    final active = widget.active;
+    final onTap = widget.onTap;
+    final centerContent = widget.centerContent;
     final strong = onDark ? Colors.white : const Color(0xFF111111);
     final quiet = onDark
         ? Colors.white.withValues(alpha: 0.8)
         : Colors.black.withValues(alpha: 0.55);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: LayoutBuilder(
+    // Лёгкий "прыжок" при нажатии — папка чуть сжимается и поворачивается,
+    // как будто её тронули пальцем, а не просто плоский тап без отклика.
+    return GestureDetector(
+      onTapDown: onTap == null ? null : (_) => _setPressed(true),
+      onTapUp: onTap == null ? null : (_) => _setPressed(false),
+      onTapCancel: onTap == null ? null : () => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: AnimatedRotation(
+          turns: _pressed ? (onDark ? -0.006 : 0.006) : 0,
+          duration: const Duration(milliseconds: 120),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(14),
+              child: LayoutBuilder(
           builder: (context, constraints) {
             final cardHeight =
                 constraints.hasBoundedHeight && constraints.maxHeight.isFinite
@@ -94,7 +125,7 @@ class CategoryFolderCard extends StatelessWidget {
                                 color: strong)),
                         if (count != null) ...[
                           const SizedBox(height: 3),
-                          Text(count!,
+                          Text(count,
                               textAlign: centerContent
                                   ? TextAlign.center
                                   : TextAlign.start,
@@ -109,7 +140,10 @@ class CategoryFolderCard extends StatelessWidget {
                 ],
               ),
             );
-          },
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
