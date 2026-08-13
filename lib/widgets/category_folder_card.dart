@@ -11,6 +11,10 @@ class CategoryFolderCard extends StatelessWidget {
   final bool onDark;
   final bool active;
   final VoidCallback? onTap;
+  // Для карточек с коротким текстом в ряду одинаковой высоты (напр.
+  // "Подборки для вас") — центрируем содержимое, а не жмём в левый верхний
+  // угол как в "папках" категорий (там текст нарочно у корешка).
+  final bool centerContent;
 
   const CategoryFolderCard({
     super.key,
@@ -20,6 +24,7 @@ class CategoryFolderCard extends StatelessWidget {
     this.onDark = true,
     this.active = false,
     this.onTap,
+    this.centerContent = false,
   });
 
   @override
@@ -33,59 +38,78 @@ class CategoryFolderCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.only(top: 18),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 14,
-                top: -18,
-                child: Container(
-                  width: 70,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(9)),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final cardHeight =
+                constraints.hasBoundedHeight && constraints.maxHeight.isFinite
+                    ? constraints.maxHeight - 18
+                    : null;
+            return Padding(
+              padding: const EdgeInsets.only(top: 18),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 14,
+                    top: -18,
+                    child: Container(
+                      width: 70,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(9)),
+                      ),
+                    ),
                   ),
-                ),
+                  Container(
+                    width: double.infinity,
+                    height: cardHeight,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(16),
+                      border: active
+                          ? Border.all(color: Colors.white, width: 2.5)
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: centerContent
+                          ? CrossAxisAlignment.center
+                          : CrossAxisAlignment.start,
+                      mainAxisAlignment: centerContent
+                          ? MainAxisAlignment.center
+                          : MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign:
+                                centerContent ? TextAlign.center : TextAlign.start,
+                            style: GoogleFonts.montserrat(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                height: 1.15,
+                                color: strong)),
+                        if (count != null) ...[
+                          const SizedBox(height: 3),
+                          Text(count!,
+                              textAlign: centerContent
+                                  ? TextAlign.center
+                                  : TextAlign.start,
+                              style: GoogleFonts.jetBrainsMono(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: quiet)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(16),
-                  border: active
-                      ? Border.all(color: Colors.white, width: 2.5)
-                      : null,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 18,
-                            height: 1.15,
-                            color: strong)),
-                    if (count != null) ...[
-                      const SizedBox(height: 3),
-                      Text(count!,
-                          style: GoogleFonts.jetBrainsMono(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                              color: quiet)),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

@@ -342,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTrendingRow() {
     return SizedBox(
-      height: 118,
+      height: 150,
       child: _isLoading
           ? ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -466,6 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: AppColors.categoryColor(category),
               onDark: AppColors.categoryOnDark(category),
               onTap: () => _openCollection(collection),
+              centerContent: true,
             ),
           );
         },

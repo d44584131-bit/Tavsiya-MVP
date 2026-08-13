@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../l10n/strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 
@@ -65,46 +66,73 @@ class PlaceCard extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(data.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.montserrat(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                              height: 1.15,
-                              color: strong)),
-                      const SizedBox(height: 4),
-                      Text(data.district,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.montserrat(
-                              fontWeight: FontWeight.w600,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(data.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                  height: 1.15,
+                                  color: strong)),
+                          const SizedBox(height: 4),
+                          Text(data.district,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: quiet)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111010),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text('★ ${data.rating.toStringAsFixed(1)}',
+                          style: GoogleFonts.jetBrainsMono(
+                              fontWeight: FontWeight.w700,
                               fontSize: 12,
-                              color: quiet)),
-                    ],
-                  ),
+                              color: Colors.white)),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(height: 10),
                 Container(
+                  width: double.infinity,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111010),
-                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text('★ ${data.rating.toStringAsFixed(1)}',
-                      style: GoogleFonts.jetBrainsMono(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                          color: Colors.white)),
+                  child: Text(
+                    data.reviewsCount > 0
+                        ? s(context).reviewsCount(data.reviewsCount)
+                        : s(context).noReviewsTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.montserrat(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: const Color(0xFF111111)),
+                  ),
                 ),
               ],
             ),
@@ -145,7 +173,7 @@ class _PlaceCardSkeletonState extends State<PlaceCardSkeleton>
         final shimmer = Color.lerp(base, theme.cardColor, _c.value)!;
         return Container(
           width: 230,
-          height: 96,
+          height: 130,
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
             color: shimmer,
