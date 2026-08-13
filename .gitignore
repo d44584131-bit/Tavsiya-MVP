@@ -46,3 +46,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Release signing key — never commit, lives only as a GitHub Actions secret
+# (KEYSTORE_BASE64) decoded at build time. See android/app/build.gradle.kts.
+*.jks
+*.p12
+key.properties

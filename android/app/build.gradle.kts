@@ -4,6 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Стабильный ключ подписи релизных сборок — нужен, чтобы обновления APK
+// ставились поверх старой версии (а не требовали удаления приложения) и
+// чтобы SHA-1 отпечаток, зарегистрированный в Google Cloud под нативный
+// Google Sign-In, не менялся от сборки к сборке. Секреты приходят из CI
+// (см. .github/workflows/build-apk.yml); при их отсутствии (локальная
+// сборка) release тихо падает обратно на debug-ключ, как было раньше.
+val releaseKeystorePath: String? = System.getenv("ANDROID_KEYSTORE_PATH")
+val hasReleaseSigning =
+    !releaseKeystorePath.isNullOrEmpty() && file(releaseKeystorePath).exists()
+
 android {
     namespace = "com.example.tavsiya"
     compileSdk = flutter.compileSdkVersion
@@ -25,11 +35,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
