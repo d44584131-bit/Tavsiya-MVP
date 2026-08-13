@@ -1,6 +1,7 @@
 import 'dart:typed_data' show Uint8List;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'l10n/strings.dart';
 import 'services/feedback_service.dart';
@@ -52,15 +53,37 @@ class SupabaseService {
     await _client.auth.signOut();
   }
 
-  /// Вход/регистрация через Google. На вебе браузер сам вернётся на текущий
-  /// адрес после подтверждения; на Android/iOS — через deep link
-  /// 'com.example.tavsiya://login-callback/' (см. AndroidManifest.xml /
-  /// Info.plist). Требует включённого провайдера Google в Supabase Dashboard
-  /// (Authentication → Providers) с Client ID/Secret из Google Cloud Console.
+  /// Web OAuth Client ID проекта в Google Cloud — тот же, что указан в
+  /// Supabase Dashboard → Authentication → Providers → Google → Client ID.
+  /// Это публичный идентификатор (не секрет), поэтому его можно держать
+  /// прямо в клиентском коде — в отличие от Client Secret.
+  static const _googleWebClientId =
+      '872653200637-5pa6td3k6fsft8bci3ic1ghs1vlqr1ig.apps.googleusercontent.com';
+
+  /// Вход/регистрация через Google. На вебе — системный OAuth-редирект
+  /// (Supabase сам вернётся на текущий адрес). На Android/iOS — нативный
+  /// выбор аккаунта (Google Sign-In): показывает аккаунты, уже сохранённые
+  /// на устройстве, без открытия браузера — ID-токен обменивается на сессию
+  /// Supabase напрямую. Требует Android OAuth Client ID (package name +
+  /// SHA-1 релизного ключа сборки), заведённого в том же проекте Google
+  /// Cloud, что и Web Client ID выше.
   static Future<void> signInWithGoogle() async {
-    await _client.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: kIsWeb ? null : 'com.example.tavsiya://login-callback/',
+    if (kIsWeb) {
+      await _client.auth.signInWithOAuth(OAuthProvider.google);
+      return;
+    }
+    final googleSignIn = GoogleSignIn(serverClientId: _googleWebClientId);
+    final account = await googleSignIn.signIn();
+    if (account == null) return; // пользователь отменил выбор аккаунта
+    final auth = await account.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null) {
+      throw const AuthException('Google sign-in: missing ID token');
+    }
+    await _client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: auth.accessToken,
     );
   }
 
