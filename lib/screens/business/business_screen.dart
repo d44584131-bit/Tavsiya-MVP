@@ -294,15 +294,20 @@ class _BusinessScreenState extends State<BusinessScreen> {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           _buildHeader(theme),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _DarkStatsCard(
-              totalReviews: totalReviews,
-              avgRating: avgRating,
-              unanswered: totalUnanswered,
+          // Пока по всем заведениям аккаунта нет ни одного одобренного
+          // отзыва, сводная карточка показывала бы только нули первым, что
+          // видит владелец — до появления первых отзывов её не показываем.
+          if (totalReviews > 0) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _DarkStatsCard(
+                totalReviews: totalReviews,
+                avgRating: avgRating,
+                unanswered: totalUnanswered,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
