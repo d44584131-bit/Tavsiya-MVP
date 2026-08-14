@@ -8,6 +8,8 @@ class PlaceCardData {
   final String? status; // 'pending' | 'rejected' | null (= approved)
   final bool isChain; // сеть заведений — несколько филиалов у одного профиля
   final List<String> branches; // адреса филиалов, заполнено только у сетей
+  final double? latitude;
+  final double? longitude;
 
   const PlaceCardData({
     required this.id,
@@ -19,5 +21,9 @@ class PlaceCardData {
     this.status,
     this.isChain = false,
     this.branches = const [],
+    this.latitude,
+    this.longitude,
   });
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 }

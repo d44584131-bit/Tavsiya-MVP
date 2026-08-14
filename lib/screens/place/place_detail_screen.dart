@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/strings.dart';
+import '../../services/recent_places_service.dart';
 import '../../services/share_service.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
@@ -24,12 +25,15 @@ class PlaceDetailData {
   final String? website;
   final String? instagram;
   final String? priceLevel; // 'budget' | 'mid' | 'mid_high' | 'high'
+  final String? hours; // свободный текст, напр. "Пн–Вс: 09:00–22:00"
   final bool isVerified;
   final double rating;
   final int reviewsCount;
   final String? status; // 'pending' | 'rejected' | null (= approved)
   final bool isChain; // сеть заведений — несколько филиалов у одного профиля
   final List<String> branches; // адреса филиалов, заполнено только у сетей
+  final double? latitude;
+  final double? longitude;
 
   const PlaceDetailData({
     required this.id,
@@ -42,12 +46,15 @@ class PlaceDetailData {
     this.website,
     this.instagram,
     this.priceLevel,
+    this.hours,
     required this.isVerified,
     required this.rating,
     required this.reviewsCount,
     this.status,
     this.isChain = false,
     this.branches = const [],
+    this.latitude,
+    this.longitude,
   });
 
   static const _priceLevelLabels = {
@@ -128,6 +135,9 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         _officialPhotos = results[3] as List<String>;
         _isLoading = false;
       });
+      // Не критично для отображения места — не блокируем загрузку из-за
+      // возможной ошибки записи в SharedPreferences.
+      RecentPlacesService.recordView(widget.placeId).catchError((_) {});
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -712,6 +722,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         : place.address ?? s(context).notSpecified;
     final rows = [
       (Icons.place_rounded, s(context).infoAddress, addressValue),
+      (
+        Icons.access_time_rounded,
+        s(context).infoHours,
+        place.hours ?? s(context).notSpecified
+      ),
       (
         Icons.phone_rounded,
         s(context).infoPhone,

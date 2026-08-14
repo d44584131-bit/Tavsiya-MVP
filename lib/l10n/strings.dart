@@ -172,6 +172,7 @@ class Strings {
   String get noPhotosYet =>
       _t('Фото пока не добавлены', 'Fotolar hali qoʻshilmagan');
   String get infoAddress => _t('Адрес', 'Manzil');
+  String get infoHours => _t('Часы работы', 'Ish vaqti');
   String get infoPhone => _t('Телефон', 'Telefon');
   String get infoWebsite => _t('Сайт', 'Sayt');
   String get infoInstagram => _t('Instagram', 'Instagram');
@@ -236,6 +237,16 @@ class Strings {
   String addPlaceLabel(String name) =>
       _t('Добавить «$name»', '«$name» ni qoʻshish');
   String get placeCategoryLabel => _t('Категория места', 'Joy toifasi');
+  String get nearbyRecentSectionTitle =>
+      _t('Недавно были рядом', 'Yaqinda yonida boʻlgansiz');
+  String get popularInCitySectionTitle =>
+      _t('Популярное в городе', 'Shaharda mashhur');
+  String get nearFilterChip => _t('Рядом', 'Yaqin atrofda');
+  String distanceMeters(int meters) => '$meters ${_t('м', 'm')}';
+  String distanceKm(String km) => '$km ${_t('км', 'km')}';
+  String get notInListPrompt => _t(
+      'Нет в списке? Начните вводить название',
+      'Roʻyxatda yoʻqmi? Nomini yoza boshlang');
   String get rateQuestion =>
       _t('Как оцените место?', 'Joyni qanday baholaysiz?');
   String get yourReviewLabel => _t('Ваш отзыв', 'Sizning sharhingiz');
@@ -374,6 +385,20 @@ class Strings {
       _t('Добавить номер', 'Raqam qoʻshish');
   String get businessWebsiteLabel => _t('Сайт', 'Sayt');
   String get businessInstagramLabel => _t('Instagram', 'Instagram');
+  String get businessHoursLabel => _t('Часы работы', 'Ish vaqti');
+  String get businessHoursHint =>
+      _t('Например: Пн–Вс 09:00–22:00', 'Masalan: Dush–Yak 09:00–22:00');
+  String get businessStepBasicLabel => _t('ОСНОВНОЕ', 'ASOSIY');
+  String get businessStepPhotosLabel => _t('ФОТО И ЧАСЫ', 'FOTO VA VAQT');
+  String get businessNextPhotosButton =>
+      _t('Далее — фото и часы', 'Keyingi — foto va ish vaqti');
+  String get useCurrentLocationTooltip =>
+      _t('Использовать текущее местоположение', 'Joriy joylashuvni ishlatish');
+  String get locationCapturedSnackbar =>
+      _t('Координаты места сохранены', 'Joy koordinatalari saqlandi');
+  String get locationCaptureError => _t(
+      'Не удалось определить местоположение',
+      'Joylashuvni aniqlab boʻlmadi');
   String get saveButton => _t('Сохранить', 'Saqlash');
   String get businessSavedSnackbar =>
       _t('Изменения сохранены', 'Oʻzgarishlar saqlandi');

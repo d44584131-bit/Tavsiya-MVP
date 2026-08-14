@@ -183,7 +183,7 @@ class SupabaseService {
   // ------------------------------------------------------------
 
   static const _placeCardColumns =
-      'id, name, category, district, rating_avg, reviews_count, status, is_chain, branches';
+      'id, name, category, district, rating_avg, reviews_count, status, is_chain, branches, latitude, longitude';
 
   /// Выбранный пользователем город — фильтрует "Сейчас популярно" и поиск.
   /// Загружается из SharedPreferences при старте (см. main.dart) и меняется
@@ -208,16 +208,38 @@ class SupabaseService {
 
   /// "Сейчас популярно" — места с самым высоким рейтингом в выбранном городе.
   static Future<List<PlaceCardData>> fetchTrendingPlaces(
-      {int limit = 10, int offset = 0}) async {
-    final rows = await _client
+      {int limit = 10, int offset = 0, String? category}) async {
+    var builder = _client
         .from('places')
         .select(_placeCardColumns)
         .eq('city', cityKey)
-        .eq('status', 'approved')
+        .eq('status', 'approved');
+    if (category != null) {
+      builder = builder.eq('category', category);
+    }
+    final rows = await builder
         .order('rating_avg', ascending: false)
         .range(offset, offset + limit - 1);
 
     return (rows as List).map((r) => _placeFromRow(r)).toList();
+  }
+
+  /// Места по списку id, с сохранением порядка списка — используется для
+  /// секции "Недавно были рядом" (шаг выбора места в форме отзыва), где
+  /// порядок задаёт локальная история просмотров (RecentPlacesService).
+  static Future<List<PlaceCardData>> fetchPlacesByIds(
+      List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final rows = await _client
+        .from('places')
+        .select(_placeCardColumns)
+        .inFilter('id', ids)
+        .eq('status', 'approved');
+    final byId = {
+      for (final r in (rows as List).cast<Map<String, dynamic>>())
+        r['id'] as String: _placeFromRow(r)
+    };
+    return ids.map((id) => byId[id]).whereType<PlaceCardData>().toList();
   }
 
   /// Поиск мест по названию (ILIKE через pg_trgm) в выбранном городе,
@@ -250,7 +272,10 @@ class SupabaseService {
   /// место сразу уходит на модерацию в Telegram (status='pending' по
   /// умолчанию) и не видно другим, пока админ не одобрит.
   static Future<PlaceCardData> createPlace(
-      {required String name, required String category}) async {
+      {required String name,
+      required String category,
+      double? latitude,
+      double? longitude}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
 
@@ -260,7 +285,9 @@ class SupabaseService {
           'name': name,
           'category': category,
           'city': cityKey,
-          'created_by': userId
+          'created_by': userId,
+          'latitude': latitude,
+          'longitude': longitude,
         })
         .select(_placeCardColumns)
         .single();
@@ -344,6 +371,9 @@ class SupabaseService {
     String? website,
     String? instagram,
     String? priceLevel,
+    String? hours,
+    double? latitude,
+    double? longitude,
     bool isChain = false,
     List<String> branches = const [],
   }) async {
@@ -362,6 +392,9 @@ class SupabaseService {
           'website': website,
           'instagram': instagram,
           'price_level': priceLevel,
+          'hours': hours,
+          'latitude': latitude,
+          'longitude': longitude,
           'created_by': userId,
           'is_chain': isChain,
           'branches': isChain && branches.isNotEmpty ? branches : null,
@@ -390,6 +423,9 @@ class SupabaseService {
     String? website,
     String? instagram,
     String? priceLevel,
+    String? hours,
+    double? latitude,
+    double? longitude,
     bool isChain = false,
     List<String> branches = const [],
   }) async {
@@ -402,6 +438,9 @@ class SupabaseService {
       'website': website,
       'instagram': instagram,
       'price_level': priceLevel,
+      'hours': hours,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
       'is_chain': isChain,
       'branches': isChain && branches.isNotEmpty ? branches : null,
     }).eq('id', placeId);
@@ -475,8 +514,8 @@ class SupabaseService {
     final row = await _client
         .from('places')
         .select(
-          'id, name, category, description, address, district, phone, website, instagram, price_level, '
-          'is_verified, rating_avg, reviews_count, status, is_chain, branches',
+          'id, name, category, description, address, district, phone, website, instagram, price_level, hours, '
+          'is_verified, rating_avg, reviews_count, status, is_chain, branches, latitude, longitude',
         )
         .eq('id', id)
         .single();
@@ -492,12 +531,15 @@ class SupabaseService {
       website: row['website'] as String?,
       instagram: row['instagram'] as String?,
       priceLevel: row['price_level'] as String?,
+      hours: row['hours'] as String?,
       isVerified: row['is_verified'] as bool,
       rating: (row['rating_avg'] as num).toDouble(),
       reviewsCount: row['reviews_count'] as int,
       status: row['status'] == 'approved' ? null : row['status'] as String?,
       isChain: row['is_chain'] as bool? ?? false,
       branches: _branchesFromRow(row),
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -512,6 +554,8 @@ class SupabaseService {
       status: r['status'] == 'approved' ? null : r['status'] as String?,
       isChain: r['is_chain'] as bool? ?? false,
       branches: _branchesFromRow(r),
+      latitude: (r['latitude'] as num?)?.toDouble(),
+      longitude: (r['longitude'] as num?)?.toDouble(),
     );
   }
 

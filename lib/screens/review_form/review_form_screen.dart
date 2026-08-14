@@ -2,12 +2,16 @@ import 'dart:async';
 import 'dart:typed_data' show Uint8List;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import '../../l10n/strings.dart';
+import '../../services/location_service.dart';
 import '../../services/permission_service.dart';
+import '../../services/recent_places_service.dart';
 import '../../supabase_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_dimens.dart';
 import '../../widgets/place_card.dart';
 import '../../widgets/star_rating_input.dart';
 import '../../widgets/auth_required_dialog.dart';
@@ -64,12 +68,24 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       PageController(initialPage: _hasPreselection ? 1 : 0);
   final _textController = TextEditingController();
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
 
   late int _step = _hasPreselection ? 1 : 0;
   PlaceCardData? _selectedExistingPlace;
   String? _selectedBranch; // выбранный филиал — только для сетей заведений
   String? _newPlaceName;
   String? _newPlaceCategory;
+
+  // --- Шаг 1: "Рядом" / "Недавно были рядом" / "Популярное в городе" ---
+  double? _userLat;
+  double? _userLng;
+  String? _categoryFilter; // null = "Рядом" (без фильтра категории)
+  List<PlaceCardData> _recentPlaces = const [];
+  List<PlaceCardData> _popularPlaces = const [];
+  bool _isLoadingBrowse = true;
+
+  bool get _isBrowsing =>
+      _searchController.text.trim().isEmpty && _categoryFilter == null;
   int _rating = 0;
   final _picker = ImagePicker();
   final List<Uint8List> _photoBytes = [];
@@ -120,6 +136,72 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
     } else {
       _selectedExistingPlace = widget.preselectedPlace;
     }
+    _searchPlaces();
+    _loadLocationAndBrowseLists();
+  }
+
+  Future<void> _loadLocationAndBrowseLists() async {
+    final position = await LocationService.getCurrentPosition();
+    if (mounted && position != null) {
+      setState(() {
+        _userLat = position.latitude;
+        _userLng = position.longitude;
+      });
+    }
+    try {
+      final recentIds = await RecentPlacesService.recentPlaceIds();
+      final results = await Future.wait([
+        SupabaseService.fetchPlacesByIds(recentIds),
+        SupabaseService.fetchTrendingPlaces(limit: 6),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _recentPlaces = results[0];
+        _popularPlaces = results[1];
+        _isLoadingBrowse = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingBrowse = false);
+    }
+  }
+
+  double? _distanceMetersTo(PlaceCardData place) {
+    if (_userLat == null || _userLng == null || !place.hasCoordinates) {
+      return null;
+    }
+    return LocationService.distanceMeters(
+        _userLat!, _userLng!, place.latitude!, place.longitude!);
+  }
+
+  String? _distanceLabel(PlaceCardData place) {
+    final meters = _distanceMetersTo(place);
+    if (meters == null) return null;
+    if (meters < 1000) return s(context).distanceMeters(meters.round());
+    return s(context).distanceKm((meters / 1000).toStringAsFixed(1));
+  }
+
+  List<PlaceCardData> _sortByDistance(List<PlaceCardData> places) {
+    if (_userLat == null || _userLng == null) return places;
+    final withDistance =
+        places.map((p) => (p, _distanceMetersTo(p))).toList();
+    withDistance.sort((a, b) {
+      if (a.$2 == null && b.$2 == null) return 0;
+      if (a.$2 == null) return 1;
+      if (b.$2 == null) return -1;
+      return a.$2!.compareTo(b.$2!);
+    });
+    return withDistance.map((e) => e.$1).toList();
+  }
+
+  void _selectExistingPlace(PlaceCardData place) => setState(() {
+        _selectedExistingPlace = place;
+        _selectedBranch = null;
+        _newPlaceName = null;
+        _newPlaceCategory = null;
+      });
+
+  void _selectCategoryFilter(String? key) {
+    setState(() => _categoryFilter = key);
     _searchPlaces();
   }
 
@@ -176,6 +258,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
     _controller.dispose();
     _textController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _prosController.dispose();
     _consController.dispose();
     super.dispose();
@@ -197,11 +280,11 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   Future<void> _searchPlaces() async {
     setState(() => _isSearchingPlaces = true);
     try {
-      final results =
-          await SupabaseService.searchPlaces(query: _searchController.text);
+      final results = await SupabaseService.searchPlaces(
+          query: _searchController.text, category: _categoryFilter);
       if (!mounted) return;
       setState(() {
-        _placeResults = results;
+        _placeResults = _sortByDistance(results);
         _isSearchingPlaces = false;
       });
     } catch (_) {
@@ -429,6 +512,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             ),
             child: TextField(
               controller: _searchController,
+              focusNode: _searchFocusNode,
               onChanged: (_) => _onSearchChanged(),
               decoration: InputDecoration(
                 border: InputBorder.none,
@@ -439,58 +523,115 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          _CategoryFilterRow(
+              selected: _categoryFilter, onSelected: _selectCategoryFilter),
+          const SizedBox(height: 12),
           Expanded(
-            child: ListView(
-              children: [
-                if (_isSearchingPlaces)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else ...[
-                  ..._placeResults.map((p) => _PlaceOption(
-                        name: p.name,
-                        selected: _selectedExistingPlace?.id == p.id,
-                        onTap: () => setState(() {
-                          _selectedExistingPlace = p;
-                          _selectedBranch = null;
-                          _newPlaceName = null;
-                          _newPlaceCategory = null;
-                        }),
-                      )),
-                  if (query.isNotEmpty)
-                    _PlaceOption(
-                      name: query,
-                      isNew: true,
-                      selected: _newPlaceName == query,
-                      onTap: () => setState(() {
-                        _newPlaceName = query;
-                        _selectedExistingPlace = null;
-                        _selectedBranch = null;
-                      }),
-                    ),
-                  if (_newPlaceName != null) ...[
-                    const SizedBox(height: 12),
-                    ChipSelector(
-                      label: s(context).placeCategoryLabel,
-                      options: _newPlaceCategoryKeys
-                          .map((k) => s(context).categoryLabel(k))
-                          .toList(),
-                      selected: _newPlaceCategory == null
-                          ? null
-                          : s(context).categoryLabel(_newPlaceCategory!),
-                      onSelected: (label) => setState(() {
-                        _newPlaceCategory = _newPlaceCategoryKeys.firstWhere(
-                            (k) => s(context).categoryLabel(k) == label);
-                      }),
-                    ),
-                  ],
-                ],
-              ],
-            ),
+            child: _isBrowsing
+                ? _buildBrowseList(theme)
+                : _buildFilteredList(theme, query),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBrowseList(ThemeData theme) {
+    if (_isLoadingBrowse) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return ListView(
+      children: [
+        if (_recentPlaces.isNotEmpty) ...[
+          _SectionLabel(text: s(context).nearbyRecentSectionTitle),
+          const SizedBox(height: 8),
+          ..._recentPlaces.map((p) => _PlaceRow(
+                place: p,
+                distanceLabel: _distanceLabel(p),
+                selected: _selectedExistingPlace?.id == p.id,
+                onTap: () => _selectExistingPlace(p),
+              )),
+          const SizedBox(height: 16),
+        ],
+        if (_popularPlaces.isNotEmpty) ...[
+          _SectionLabel(text: s(context).popularInCitySectionTitle),
+          const SizedBox(height: 8),
+          ..._popularPlaces.map((p) => _PlaceRow(
+                place: p,
+                distanceLabel: _distanceLabel(p),
+                selected: _selectedExistingPlace?.id == p.id,
+                onTap: () => _selectExistingPlace(p),
+              )),
+          const SizedBox(height: 16),
+        ],
+        InkWell(
+          onTap: () => _searchFocusNode.requestFocus(),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.dividerColor),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.add_location_alt_rounded,
+                    color: theme.colorScheme.primary, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(s(context).notInListPrompt,
+                      style: theme.textTheme.bodyLarge),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilteredList(ThemeData theme, String query) {
+    if (_isSearchingPlaces) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return ListView(
+      children: [
+        ..._placeResults.map((p) => _PlaceRow(
+              place: p,
+              distanceLabel: _distanceLabel(p),
+              selected: _selectedExistingPlace?.id == p.id,
+              onTap: () => _selectExistingPlace(p),
+            )),
+        if (query.isNotEmpty)
+          _AddNewPlaceRow(
+            label: s(context).addPlaceLabel(query),
+            selected: _newPlaceName == query,
+            onTap: () => setState(() {
+              _newPlaceName = query;
+              _selectedExistingPlace = null;
+              _selectedBranch = null;
+            }),
+          ),
+        if (_newPlaceName != null) ...[
+          const SizedBox(height: 12),
+          ChipSelector(
+            label: s(context).placeCategoryLabel,
+            options: _newPlaceCategoryKeys
+                .map((k) => s(context).categoryLabel(k))
+                .toList(),
+            selected: _newPlaceCategory == null
+                ? null
+                : s(context).categoryLabel(_newPlaceCategory!),
+            onSelected: (label) => setState(() {
+              _newPlaceCategory = _newPlaceCategoryKeys.firstWhere(
+                  (k) => s(context).categoryLabel(k) == label);
+            }),
+          ),
+        ],
+      ],
     );
   }
 
@@ -793,52 +934,203 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
   }
 }
 
-class _PlaceOption extends StatelessWidget {
-  final String name;
-  final bool selected;
-  final bool isNew;
-  final VoidCallback onTap;
-  const _PlaceOption(
-      {required this.name,
-      required this.selected,
-      required this.onTap,
-      this.isNew = false});
+/// Ряд фильтр-чипов над списком мест: "Рядом" (без фильтра категории) +
+/// категории — совмещает "браузинг" (недавние/популярные) и обычный поиск
+/// по названию под одним и тем же переключателем.
+class _CategoryFilterRow extends StatelessWidget {
+  static const _keys = ['restaurant', 'cafe', 'park', 'mall'];
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+  const _CategoryFilterRow({required this.selected, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    Widget chip(String? key, String label) {
+      final isActive = key == selected;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.tag),
+          child: InkWell(
+            onTap: () => onSelected(key),
+            borderRadius: BorderRadius.circular(AppRadius.tag),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: isActive ? theme.colorScheme.primary : theme.cardColor,
+                borderRadius: BorderRadius.circular(AppRadius.tag),
+                border: Border.all(
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : theme.dividerColor),
+              ),
+              child: Text(
+                label.toUpperCase(),
+                style: GoogleFonts.jetBrainsMono(
+                    color: isActive
+                        ? Colors.white
+                        : theme.textTheme.bodyLarge?.color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    letterSpacing: 0.5),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          chip(null, s(context).nearFilterChip),
+          ..._CategoryFilterRow._keys
+              .map((k) => chip(k, s(context).categoryPlural(k))),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(text.toUpperCase(),
+        style: GoogleFonts.jetBrainsMono(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+            color: theme.textTheme.labelSmall?.color));
+  }
+}
+
+/// Строка места в списке выбора (недавние/популярные/результаты поиска) —
+/// цветной круг-инициал по категории, название, категория+район, справа
+/// расстояние (если известны координаты) или галочка выбора.
+class _PlaceRow extends StatelessWidget {
+  final PlaceCardData place;
+  final String? distanceLabel;
+  final bool selected;
+  final VoidCallback onTap;
+  const _PlaceRow(
+      {required this.place,
+      required this.distanceLabel,
+      required this.selected,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = AppColors.categoryColor(place.category);
+    final onDark = AppColors.categoryOnDark(place.category);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: selected
-                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                ? theme.colorScheme.primary.withValues(alpha: 0.08)
                 : theme.cardColor,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
                 color:
-                    selected ? theme.colorScheme.primary : theme.dividerColor),
+                    selected ? theme.colorScheme.primary : theme.dividerColor,
+                width: selected ? 1.5 : 1),
           ),
           child: Row(
             children: [
-              Icon(isNew ? Icons.add_location_alt_rounded : Icons.place_rounded,
-                  color: theme.colorScheme.primary, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: color,
                 child: Text(
-                  isNew ? s(context).addPlaceLabel(name) : name,
-                  style: theme.textTheme.bodyLarge,
+                  place.name.isNotEmpty ? place.name[0].toUpperCase() : '?',
+                  style: TextStyle(
+                      color: onDark ? Colors.white : const Color(0xFF111111),
+                      fontWeight: FontWeight.w800),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(place.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(
+                        '${s(context).categoryLabel(place.category).toUpperCase()} · ${place.district}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
               if (selected)
                 Icon(Icons.check_circle_rounded,
-                    color: theme.colorScheme.primary, size: 20),
+                    color: theme.colorScheme.primary, size: 20)
+              else if (distanceLabel != null)
+                Text(distanceLabel!, style: theme.textTheme.labelSmall),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Нет в списке — добавить новое место" — с уже введённым названием
+/// (только в состоянии поиска/фильтра, см. _buildFilteredList).
+class _AddNewPlaceRow extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AddNewPlaceRow(
+      {required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: 0.1)
+              : theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color:
+                  selected ? theme.colorScheme.primary : theme.dividerColor),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.add_location_alt_rounded,
+                color: theme.colorScheme.primary, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label, style: theme.textTheme.bodyLarge)),
+            if (selected)
+              Icon(Icons.check_circle_rounded,
+                  color: theme.colorScheme.primary, size: 20),
+          ],
         ),
       ),
     );
