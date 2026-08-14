@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../l10n/strings.dart';
@@ -11,6 +12,9 @@ class ReviewReplyData {
   final String authorName;
   final String text;
   final bool isOwnerReply;
+  // 'approved' | 'pending' | 'rejected' — только у ответов заведения
+  // (is_owner_reply) модерация; обычные ответы всегда 'approved'.
+  final String status;
   final DateTime createdAt;
 
   const ReviewReplyData({
@@ -18,6 +22,7 @@ class ReviewReplyData {
     required this.authorName,
     required this.text,
     required this.isOwnerReply,
+    this.status = 'approved',
     required this.createdAt,
   });
 }
@@ -303,7 +308,7 @@ class _PlaceReviewCardState extends State<PlaceReviewCard> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 9, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111010),
+                      color: AppColors.darkChip(isDark),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text('★ ${data.stars}.0',
@@ -536,6 +541,32 @@ class _ReplyTile extends StatelessWidget {
                           color: theme.colorScheme.primary)),
                 ),
               ],
+              if (reply.status == 'pending' || reply.status == 'rejected') ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (reply.status == 'pending'
+                            ? AppColors.accentOrange
+                            : AppColors.negative)
+                        .withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.tag),
+                  ),
+                  child: Text(
+                      (reply.status == 'pending'
+                              ? s(context).pendingBadge
+                              : s(context).rejectedBadge)
+                          .toUpperCase(),
+                      style: GoogleFonts.jetBrainsMono(
+                          fontSize: 9,
+                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.w600,
+                          color: reply.status == 'pending'
+                              ? AppColors.accentOrange
+                              : AppColors.negative)),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -569,18 +600,15 @@ class _ReviewPhotos extends StatelessWidget {
           )),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Image.network(
-              photoUrls[i],
+            child: CachedNetworkImage(
+              imageUrl: photoUrls[i],
               width: _thumbSize,
               height: _thumbSize,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) => progress == null
-                  ? child
-                  : Container(
-                      width: _thumbSize,
-                      height: _thumbSize,
-                      color: theme.dividerColor),
-              errorBuilder: (context, error, stack) => Container(
+              memCacheWidth: 170,
+              placeholder: (context, url) => Container(
+                  width: _thumbSize, height: _thumbSize, color: theme.dividerColor),
+              errorWidget: (context, url, error) => Container(
                 width: _thumbSize,
                 height: _thumbSize,
                 color: theme.dividerColor,

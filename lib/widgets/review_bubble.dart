@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 
 enum BubbleTilt { left, leftSoft, right, rightSoft, none }
@@ -87,10 +88,11 @@ class BubbleRatingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF111010),
+        color: AppColors.darkChip(isDark),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text('★ $stars',

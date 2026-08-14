@@ -62,4 +62,19 @@ class FeedbackService {
       throw Exception('Не удалось отправить уведомление о модерации');
     }
   }
+
+  /// Уведомляет администратора в Telegram о новом/изменённом ответе
+  /// заведения на отзыв, ожидающем модерации (`api/notify-review-reply.js`).
+  /// Вызывается только для ответов от лица заведения (business-режим) —
+  /// обычные ответы пользователей друг другу модерацию не проходят.
+  static Future<void> notifyNewOwnerReply(String replyId) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/notify-review-reply'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'replyId': replyId}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось отправить уведомление о модерации');
+    }
+  }
 }

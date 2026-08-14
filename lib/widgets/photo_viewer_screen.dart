@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Полноэкранный просмотр фото (фото места, фото в отзыве) — свайп между
@@ -34,7 +35,19 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             itemCount: widget.photos.length,
             itemBuilder: (context, i) => InteractiveViewer(
               child: Center(
-                  child: Image.network(widget.photos[i], fit: BoxFit.contain)),
+                  child: CachedNetworkImage(
+                      imageUrl: widget.photos[i], fit: BoxFit.contain,
+                      // Полный размер тут нужен (пинч-зум) — только
+                      // дисковый кэш, без ограничения по ширине.
+                      placeholder: (context, url) => const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white54)),
+                      errorWidget: (context, url, error) => const Icon(
+                          Icons.broken_image_rounded,
+                          color: Colors.white54,
+                          size: 40))),
             ),
           ),
           Positioned(

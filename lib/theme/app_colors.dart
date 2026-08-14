@@ -48,6 +48,13 @@ class AppColors {
     return base.withValues(alpha: opacity);
   }
 
+  /// Тёмная плашка (рейтинг-бейдж, "чёрная" карточка статистики и т.п.) —
+  /// в светлой теме почти чёрная (контраст с бумажным фоном), но в тёмной
+  /// теме фон и так почти чёрный (ink-900), поэтому плашка станет серой —
+  /// иначе она сливается со страницей вместо того, чтобы выделяться.
+  static Color darkChip(bool isDark) =>
+      isDark ? const Color(0xFF44403A) : const Color(0xFF111010);
+
   /// Сплошной (не градиентный) фирменный цвет категории — как заливка
   /// VenueBubble/CategoryFolder в бандле Ember. В отличие от [headerGradient]
   /// это ровно те hex-токены cat-restaurant/cat-cafe/cat-park/cat-mall.

@@ -565,9 +565,9 @@ class SupabaseService {
         .from('reviews')
         .select(
             'id, rating, text, pros, cons, price_level, status, created_at, helpful_count, branch_address, '
-            'profiles!reviews_user_id_fkey(display_name, reviews_count), '
+            'profiles!reviews_user_id_fkey(display_name, reviews_count), places(name), '
             'review_photos(storage_path), review_helpful_votes(user_id), '
-            'review_replies(id, text, is_owner_reply, created_at, profiles!review_replies_user_id_fkey(display_name))')
+            'review_replies(id, text, is_owner_reply, status, created_at, profiles!review_replies_user_id_fkey(display_name))')
         .eq('place_id', placeId)
         .order('helpful_count', ascending: false)
         .order('created_at', ascending: false)
@@ -575,6 +575,7 @@ class SupabaseService {
 
     return (rows as List).map((r) {
       final profile = r['profiles'] as Map<String, dynamic>?;
+      final place = r['places'] as Map<String, dynamic>?;
       return PlaceReviewData(
         id: r['id'] as String,
         authorName: (profile?['display_name'] as String?) ??
@@ -591,25 +592,32 @@ class SupabaseService {
         authorReviewsCount: profile?['reviews_count'] as int?,
         helpfulCount: r['helpful_count'] as int? ?? 0,
         isHelpfulByMe: _isHelpfulByMe(r, userId),
-        replies: _repliesFromRow(r, language),
+        replies: _repliesFromRow(r, language, placeName: place?['name'] as String?),
         branchAddress: r['branch_address'] as String?,
       );
     }).toList();
   }
 
   static List<ReviewReplyData> _repliesFromRow(
-      Map<String, dynamic> r, AppLanguage language) {
+      Map<String, dynamic> r, AppLanguage language, {String? placeName}) {
     final raw = r['review_replies'] as List?;
     if (raw == null || raw.isEmpty) return const [];
     final replies = raw.map((rr) {
       final map = rr as Map<String, dynamic>;
       final replyProfile = map['profiles'] as Map<String, dynamic>?;
+      final isOwnerReply = map['is_owner_reply'] as bool;
       return ReviewReplyData(
         id: map['id'] as String,
-        authorName: (replyProfile?['display_name'] as String?) ??
-            Strings(language).guestReviewer,
+        // Ответ от заведения подписан именем заведения, а не именем
+        // сотрудника, который управляет профилем — как в остальных
+        // приложениях-справочниках (владелец скрыт, отвечает "бренд").
+        authorName: isOwnerReply
+            ? (placeName ?? Strings(language).guestReviewer)
+            : (replyProfile?['display_name'] as String?) ??
+                Strings(language).guestReviewer,
         text: map['text'] as String,
-        isOwnerReply: map['is_owner_reply'] as bool,
+        isOwnerReply: isOwnerReply,
+        status: map['status'] as String? ?? 'approved',
         createdAt: DateTime.parse(map['created_at'] as String),
       );
     }).toList();
@@ -753,26 +761,55 @@ class SupabaseService {
     }
   }
 
-  /// Ответ на отзыв — от обычного пользователя или от владельца места
-  /// (флаг is_owner_reply и уведомление автору отзыва проставляются
-  /// триггерами на сервере, см. schema.sql — клиент их не передаёт).
-  static Future<void> submitReviewReply(
+  /// Ответ на отзыв — от обычного пользователя или от владельца места.
+  /// is_owner_reply и статус модерации проставляются триггерами на сервере
+  /// (клиент их не передаёт и не может подделать) — если ответ оказался от
+  /// владельца места (независимо от того, с какого экрана он отправлен),
+  /// отправляем его на модерацию в Telegram, как и обычные отзывы.
+  static Future<String> submitReviewReply(
       {required String reviewId, required String text}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw StateError('Пользователь не авторизован');
-    await _client.from('review_replies').insert({
-      'review_id': reviewId,
-      'user_id': userId,
-      'text': text,
-    });
+    final row = await _client
+        .from('review_replies')
+        .insert({
+          'review_id': reviewId,
+          'user_id': userId,
+          'text': text,
+        })
+        .select('id, is_owner_reply')
+        .single();
+    final id = row['id'] as String;
+    if (row['is_owner_reply'] == true) {
+      try {
+        await FeedbackService.notifyNewOwnerReply(id);
+      } catch (_) {
+        // уведомление в Telegram не критично для успешной публикации ответа
+      }
+    }
+    return id;
   }
 
   /// Правка уже опубликованного ответа (например, заведение поправляет
   /// опечатку) — RLS review_replies_update_own разрешает менять только
-  /// свою же запись.
+  /// свою же запись. Ответ владельца места при этом снова уходит на
+  /// модерацию (см. триггер reset_owner_reply_status_on_edit в schema.sql),
+  /// поэтому тоже отправляем уведомление в Telegram.
   static Future<void> updateReviewReply(
       {required String replyId, required String text}) async {
-    await _client.from('review_replies').update({'text': text}).eq('id', replyId);
+    final row = await _client
+        .from('review_replies')
+        .update({'text': text})
+        .eq('id', replyId)
+        .select('is_owner_reply, status')
+        .single();
+    if (row['is_owner_reply'] == true && row['status'] == 'pending') {
+      try {
+        await FeedbackService.notifyNewOwnerReply(replyId);
+      } catch (_) {
+        // уведомление в Telegram не критично для успешного сохранения правки
+      }
+    }
   }
 
   // ------------------------------------------------------------

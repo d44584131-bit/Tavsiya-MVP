@@ -828,51 +828,105 @@ alter table public.places add column branches text[];
 create policy "review_replies_update_own" on public.review_replies
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- (Уведомление заведению о новом опубликованном отзыве сюда специально не
+-- добавляем ещё раз — оно уже реализовано в api/telegram-webhook.js
+-- (moderateReview → notifyPlaceOwnersOfNewReview), отправляется в момент
+-- одобрения отзыва админом. SQL-триггер под тем же именем существовал тут
+-- одну ревизию и был убран, чтобы не дублировать уведомление.)
+
+alter table public.reviews add column branch_address text;
+
 -- =========================================================
--- МИГРАЦИЯ: уведомление заведению о новом опубликованном отзыве
+-- МИГРАЦИЯ: модерация ответов заведений через Telegram-бота
 -- =========================================================
--- Отзыв всегда создаётся как pending и становится видимым только когда
--- модерация переводит его в approved (см. reviews.status default) —
--- уведомляем владельца места именно на этот переход, а не на сам insert
--- (иначе уведомление пришло бы раньше, чем отзыв реально опубликован).
-create or replace function public.notify_new_review()
+-- Ответ от заведения (is_owner_reply) теперь не публикуется мгновенно —
+-- как и обычные отзывы, уходит на модерацию в Telegram
+-- (api/notify-review-reply.js → api/telegram-webhook.js). Обычные ответы
+-- пользователей друг другу (не от владельца места) как и раньше видны
+-- сразу, без очереди — это осознанно только про заведения.
+
+alter table public.review_replies add column status text not null default 'approved';
+
+create or replace function public.set_review_reply_owner_flag()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare
-  v_place_name text;
-  v_owner record;
 begin
-  if new.status <> 'approved' or old.status = 'approved' then
-    return new;
+  new.is_owner_reply := exists (
+    select 1
+    from public.reviews r
+    join public.place_owners po on po.place_id = r.place_id
+    where r.id = new.review_id and po.user_id = new.user_id
+  );
+  if new.is_owner_reply then
+    new.status := 'pending';
   end if;
-
-  select name into v_place_name from public.places where id = new.place_id;
-
-  for v_owner in
-    select po.user_id, coalesce(pr.preferred_language, 'ru') as lang
-    from public.place_owners po
-    join public.profiles pr on pr.id = po.user_id
-    where po.place_id = new.place_id
-  loop
-    begin
-      insert into public.notifications (user_id, title, body)
-      values (
-        v_owner.user_id,
-        case when v_owner.lang = 'uz' then 'Yangi sharh' else 'Новый отзыв' end,
-        case when v_owner.lang = 'uz'
-          then '«' || v_place_name || '» uchun yangi sharh chop etildi'
-          else 'На «' || v_place_name || '» опубликован новый отзыв'
-        end
-      );
-    exception when others then
-      null;
-    end;
-  end loop;
   return new;
 end;
 $$;
 
-create trigger trg_notify_new_review
-  after update of status on public.reviews
-  for each row execute function public.notify_new_review();
+-- Правка уже опубликованного ответа заведения снова уходит на модерацию —
+-- иначе редактирование было бы лазейкой в обход неё (написать безобидный
+-- текст, дождаться одобрения, затем поменять на что угодно).
+create or replace function public.reset_owner_reply_status_on_edit()
+returns trigger language plpgsql as $$
+begin
+  if new.is_owner_reply and new.text is distinct from old.text then
+    new.status := 'pending';
+  end if;
+  return new;
+end;
+$$;
 
-alter table public.reviews add column branch_address text;
+create trigger trg_review_reply_reset_status_on_edit
+  before update on public.review_replies
+  for each row execute function public.reset_owner_reply_status_on_edit();
+
+-- Пока ответ заведения ждёт модерации, его не должен видеть никто, кроме
+-- самого заведения (review_replies_select_all показывал всё подряд).
+drop policy "review_replies_select_all" on public.review_replies;
+create policy "review_replies_select_approved_or_own" on public.review_replies
+  for select using (status = 'approved' or user_id = auth.uid());
+
+-- Раньше notify_review_reply уведомляла автора отзыва сразу при insert —
+-- но пока ответ заведения ждёт модерации, автор всё равно не может его
+-- увидеть (см. RLS выше), поэтому уведомлять рано. За уведomление на
+-- approved-переход теперь отвечает api/telegram-webhook.js (moderateReply),
+-- как и для отзывов/заведений; этот триггер остаётся только для мгновенно
+-- видимых ответов (не от владельца места).
+create or replace function public.notify_review_reply()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_review_author uuid;
+  v_place_name text;
+  v_lang text;
+begin
+  if new.status = 'pending' then
+    return new;
+  end if;
+
+  select r.user_id, p.name into v_review_author, v_place_name
+  from public.reviews r join public.places p on p.id = r.place_id
+  where r.id = new.review_id;
+
+  if v_review_author is null or v_review_author = new.user_id then
+    return new; -- не уведомляем автора о его собственном ответе
+  end if;
+
+  select coalesce(preferred_language, 'ru') into v_lang
+  from public.profiles where id = v_review_author;
+
+  begin
+    insert into public.notifications (user_id, title, body)
+    values (
+      v_review_author,
+      case when v_lang = 'uz' then 'Sharhingizga javob yozildi' else 'Ответ на ваш отзыв' end,
+      case
+        when v_lang = 'uz' then '«' || v_place_name || '» uchun sharhingizga yangi javob keldi'
+        else 'На ваш отзыв к «' || v_place_name || '» ответили'
+      end
+    );
+  exception when others then
+    null;
+  end;
+  return new;
+end;
+$$;

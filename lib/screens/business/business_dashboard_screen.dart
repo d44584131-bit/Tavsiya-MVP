@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/strings.dart';
@@ -389,12 +390,18 @@ class _BusinessDashboardScreenState extends State<BusinessDashboardScreen>
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          photo.url,
+                        child: CachedNetworkImage(
+                          imageUrl: photo.url,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          errorBuilder: (context, error, stack) => Container(
+                          // Фото хранятся до 1600px шириной — без ограничения
+                          // размера декодирования грид из 3 колонок декодировал
+                          // бы каждую в полный размер и заметно тормозил.
+                          memCacheWidth: 300,
+                          placeholder: (context, url) =>
+                              Container(color: theme.dividerColor),
+                          errorWidget: (context, url, error) => Container(
                             color: theme.dividerColor,
                             child: const Icon(Icons.broken_image_rounded),
                           ),

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -275,17 +276,21 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
                       controller: _photoPageController,
                       onPageChanged: (i) => setState(() => _photoPageIndex = i),
                       itemCount: _officialPhotos.length,
-                      itemBuilder: (context, i) => Image.network(
-                        _officialPhotos[i],
+                      itemBuilder: (context, i) => CachedNetworkImage(
+                        imageUrl: _officialPhotos[i],
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                                ? child
-                                : Container(
-                                    color: theme.cardColor,
-                                    child: const Center(
-                                        child: CircularProgressIndicator())),
-                        errorBuilder: (context, error, stack) => Container(
+                        // Фото хранятся до 1600px шириной — тут показывается
+                        // на всю ширину экрана, так что декодируем под
+                        // реальный размер экрана, а не полный оригинал.
+                        memCacheWidth:
+                            (MediaQuery.sizeOf(context).width *
+                                    MediaQuery.devicePixelRatioOf(context))
+                                .round(),
+                        placeholder: (context, url) => Container(
+                            color: theme.cardColor,
+                            child: const Center(
+                                child: CircularProgressIndicator())),
+                        errorWidget: (context, url, error) => Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
@@ -582,12 +587,12 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen>
         onTap: () => _openPhotoViewer(i),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            _allPhotos[i],
+          child: CachedNetworkImage(
+            imageUrl: _allPhotos[i],
             fit: BoxFit.cover,
-            loadingBuilder: (context, child, progress) =>
-                progress == null ? child : Container(color: theme.dividerColor),
-            errorBuilder: (context, error, stack) => Container(
+            memCacheWidth: 300,
+            placeholder: (context, url) => Container(color: theme.dividerColor),
+            errorWidget: (context, url, error) => Container(
               color: theme.dividerColor,
               child: Icon(Icons.broken_image_rounded,
                   color: theme.textTheme.bodyMedium?.color),

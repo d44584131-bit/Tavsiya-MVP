@@ -17,6 +17,7 @@ class PlaceListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = AppColors.categoryColor(data.category);
     final onDark = AppColors.categoryOnDark(data.category);
     final strong = onDark ? Colors.white : const Color(0xFF111111);
@@ -69,7 +70,7 @@ class PlaceListTile extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 9, vertical: 5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111010),
+                        color: AppColors.darkChip(isDark),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text('★ ${data.rating.toStringAsFixed(1)}',

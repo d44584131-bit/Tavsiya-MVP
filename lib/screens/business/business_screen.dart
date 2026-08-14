@@ -430,11 +430,12 @@ class _DarkStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF111010),
+        color: AppColors.darkChip(isDark),
         borderRadius: BorderRadius.circular(AppRadius.folder),
       ),
       child: Row(

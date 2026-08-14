@@ -721,11 +721,12 @@ class _DarkLevelCard extends StatelessWidget {
     final subtitleText = nextLevelName != null
         ? s(context).reviewsRemaining(target - count)
         : s(context).maxLevelReached;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF111010),
+        color: AppColors.darkChip(isDark),
         borderRadius: BorderRadius.circular(AppRadius.folder),
       ),
       child: Column(
@@ -820,6 +821,7 @@ class _PillTabBarState extends State<_PillTabBar> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -830,7 +832,7 @@ class _PillTabBarState extends State<_PillTabBar> {
         itemBuilder: (context, i) {
           final active = widget.controller.index == i;
           return Material(
-            color: active ? const Color(0xFF111010) : theme.cardColor,
+            color: active ? AppColors.darkChip(isDark) : theme.cardColor,
             borderRadius: BorderRadius.circular(AppRadius.bubble),
             child: InkWell(
               borderRadius: BorderRadius.circular(AppRadius.bubble),

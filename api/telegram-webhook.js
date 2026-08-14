@@ -45,6 +45,8 @@ module.exports = async (req, res) => {
     label = await moderateReview({ id, approve: prefix === 'approve', botToken, serviceKey });
   } else if (['place_approve', 'place_reject'].includes(prefix) && id) {
     label = await moderatePlace({ id, approve: prefix === 'place_approve', botToken, serviceKey });
+  } else if (['reply_approve', 'reply_reject'].includes(prefix) && id) {
+    label = await moderateReply({ id, approve: prefix === 'reply_approve', serviceKey });
   } else {
     await answerCallback(botToken, query.id, 'Некорректная кнопка');
     res.status(200).json({ ok: true });
@@ -145,6 +147,53 @@ async function notifyPlaceOwnersOfNewReview({ placeId, placeName, reviewAuthorId
       lang === 'uz' ? `«${placeName}» uchun yangi sharh` : `Новый отзыв на «${placeName}»`;
     await insertNotification({ userId: owner.user_id, title, body, serviceKey });
   }
+}
+
+/// Одобрение/отклонение ответа заведения на отзыв. При одобрении
+/// уведомляет автора отзыва на его языке интерфейса (тот же текст, что
+/// раньше отправлял SQL-триггер notify_review_reply мгновенно при insert —
+/// теперь это происходит только здесь, на approve, потому что до этого
+/// момента ответ никому, кроме заведения, не виден по RLS).
+async function moderateReply({ id, approve, serviceKey }) {
+  const newStatus = approve ? 'approved' : 'rejected';
+
+  const updateRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/review_replies?id=eq.${id}&select=user_id,review_id,reviews(user_id,places(name))`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ status: newStatus }),
+    },
+  );
+  if (!updateRes.ok) return null;
+
+  if (approve) {
+    const rows = await updateRes.json();
+    const updated = Array.isArray(rows) ? rows[0] : null;
+    const reviewAuthorId = updated?.reviews?.user_id;
+    const placeName = updated?.reviews?.places?.name ?? '';
+    if (reviewAuthorId && reviewAuthorId !== updated?.user_id) {
+      const profRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${reviewAuthorId}&select=preferred_language`,
+        { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+      );
+      const profRows = profRes.ok ? await profRes.json() : [];
+      const lang = profRows[0]?.preferred_language === 'uz' ? 'uz' : 'ru';
+      const title = lang === 'uz' ? 'Sharhingizga javob yozildi' : 'Ответ на ваш отзыв';
+      const body =
+        lang === 'uz'
+          ? `«${placeName}» muassasasi sharhingizga javob berdi`
+          : `Заведение «${placeName}» ответило на ваш отзыв`;
+      await insertNotification({ userId: reviewAuthorId, title, body, serviceKey });
+    }
+  }
+
+  return approve ? '✅ Одобрено' : '❌ Отклонено';
 }
 
 /// Одобрение/отклонение нового заведения. При одобрении место становится
