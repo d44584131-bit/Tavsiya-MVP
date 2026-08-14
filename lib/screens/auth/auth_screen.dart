@@ -27,7 +27,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _isSubmitting = false;
-  // bool _isGoogleSubmitting = false; // см. _signInWithGoogle ниже
+  bool _isGoogleSubmitting = false;
   bool _handledAuth = false;
   String? _error;
 
@@ -123,27 +123,25 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  // Отключено вместе с кнопкой ниже и SupabaseService.signInWithGoogle —
-  // см. комментарий там же про Android OAuth Client ID.
-  // Future<void> _signInWithGoogle() async {
-  //   if (_isGoogleSubmitting) return;
-  //   setState(() {
-  //     _isGoogleSubmitting = true;
-  //     _error = null;
-  //   });
-  //   try {
-  //     await SupabaseService.signInWithGoogle();
-  //     // На вебе и на мобильных это открывает системный браузер/окно Google
-  //     // и возвращается в приложение через redirect — сам экран закроется
-  //     // через authStateChanges у вызывающего экрана, здесь просто снимаем
-  //     // индикатор загрузки на случай, если пользователь отменит вход.
-  //   } catch (_) {
-  //     if (!mounted) return;
-  //     setState(() => _error = s(context).googleSignInError);
-  //   } finally {
-  //     if (mounted) setState(() => _isGoogleSubmitting = false);
-  //   }
-  // }
+  Future<void> _signInWithGoogle() async {
+    if (_isGoogleSubmitting) return;
+    setState(() {
+      _isGoogleSubmitting = true;
+      _error = null;
+    });
+    try {
+      await SupabaseService.signInWithGoogle();
+      // На вебе и на мобильных это открывает системный браузер/окно Google
+      // и возвращается в приложение через redirect — сам экран закроется
+      // через authStateChanges у вызывающего экрана, здесь просто снимаем
+      // индикатор загрузки на случай, если пользователь отменит вход.
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = s(context).googleSignInError);
+    } finally {
+      if (mounted) setState(() => _isGoogleSubmitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -178,35 +176,32 @@ class _AuthScreenState extends State<AuthScreen> {
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 28),
-              // Вход через Google отключён (см. auth_screen.dart._signInWithGoogle
-              // и SupabaseService.signInWithGoogle) — Android OAuth Client ID
-              // ещё не заведён в Google Cloud. Раскомментировать вместе с ними.
-              // SizedBox(
-              //   width: double.infinity,
-              //   child: OutlinedButton.icon(
-              //     onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
-              //     icon: _isGoogleSubmitting
-              //         ? const SizedBox(
-              //             height: 18,
-              //             width: 18,
-              //             child: CircularProgressIndicator(strokeWidth: 2))
-              //         : const _GoogleLogo(),
-              //     label: Text(s(context).continueWithGoogle),
-              //   ),
-              // ),
-              // const SizedBox(height: 20),
-              // Row(
-              //   children: [
-              //     Expanded(child: Divider(color: theme.dividerColor)),
-              //     Padding(
-              //       padding: const EdgeInsets.symmetric(horizontal: 12),
-              //       child: Text(s(context).orDivider,
-              //           style: theme.textTheme.labelSmall),
-              //     ),
-              //     Expanded(child: Divider(color: theme.dividerColor)),
-              //   ],
-              // ),
-              // const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isGoogleSubmitting ? null : _signInWithGoogle,
+                  icon: _isGoogleSubmitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const _GoogleLogo(),
+                  label: Text(s(context).continueWithGoogle),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: theme.dividerColor)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(s(context).orDivider,
+                        style: theme.textTheme.labelSmall),
+                  ),
+                  Expanded(child: Divider(color: theme.dividerColor)),
+                ],
+              ),
+              const SizedBox(height: 20),
               AutofillGroup(
                 child: Column(
                   children: [
@@ -323,9 +318,6 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-// Лого для кнопки "Войти через Google" — отключено вместе с самой кнопкой
-// выше, оставлено на потом.
-/*
 /// Лого Google без внешнего SVG-ассета: 4 сектора кольца в фирменных цветах.
 class _GoogleLogo extends StatelessWidget {
   const _GoogleLogo();
@@ -380,4 +372,3 @@ class _GoogleLogoPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-*/
